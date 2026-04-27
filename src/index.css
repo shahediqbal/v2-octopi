@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+/* ─── Override Tailwind v4 default blue accent / ring colors → slate/gray ─── */
+@layer base {
+  :root {
+    --color-primary: #4b5563;        /* gray-600  */
+    --color-primary-hover: #374151;  /* gray-700  */
+    --tw-ring-color: #9ca3af;        /* gray-400  */
+    accent-color: #6b7280;           /* gray-500  */
+  }
+
+  /* Remove browser blue focus outline — replaced by our ring utilities */
+  *:focus-visible {
+    outline: 2px solid #9ca3af; /* gray-400 */
+    outline-offset: 2px;
+  }
+
+  /* Kill the blue text-decoration on links */
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Scrollbar — neutral */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #f3f4f6; }  /* gray-100 */
+  ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }  /* gray-300 */
+  ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }  /* gray-400 */
+}
+
+/* ─── Base resets ─── */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f3f4f6;  /* gray-100 */
+  color: #111827;       /* gray-900 */
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
