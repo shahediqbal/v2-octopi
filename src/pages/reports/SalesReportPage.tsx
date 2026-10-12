@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Search, FileSpreadsheet, RefreshCw, Loader2, AlertCircle, Database } from 'lucide-react'
 import { useSalesReport } from '@/hooks/useSalesReport'
-import { exportExcelOnDemand } from '@/utils/lazyExportExcel'
+import { exportSalesReportExcel } from '@/utils/exportSalesReportExcel'
 import { PaginatedCombobox } from '@/components/dropdowns'
 import type { SalesReportFilters } from '@/types/salesReport'
 
@@ -33,29 +33,6 @@ function fmtAmount(v: number | null) {
   if (v == null) return '-'
   return v.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
-/** Excel column definitions for the sales report */
-const EXCEL_COLUMNS = [
-  { key: 'soSystemId', header: 'System Id', format: 'integer' as const },
-  { key: 'soSystemNo', header: 'Invoice No' },
-  { key: 'invoiceDate', header: 'Invoice Date', format: 'date' as const },
-  { key: 'entityName', header: 'Entity Name' },
-  { key: 'entityAddress', header: 'Entity Address' },
-  { key: 'sobFinalBill', header: 'Invoice Amount', format: 'number' as const },
-  { key: 'jobType', header: 'Type Of Sales' },
-  { key: 'lifecycleName', header: 'Current Status' },
-  { key: 'soOrderFrom', header: 'Generated From' },
-  { key: 'orderStatus', header: 'Order Status' },
-  { key: 'atEscalation', header: 'Order Escalation At', format: 'datetime' as const },
-  { key: 'atInvoicing', header: 'Invoicing At', format: 'datetime' as const },
-  { key: 'atPacking', header: 'Packing At', format: 'datetime' as const },
-  { key: 'atAssign', header: 'Assign At', format: 'datetime' as const },
-  { key: 'atDelivery', header: 'Delivery Started At', format: 'datetime' as const },
-  { key: 'delivered', header: 'Delivered At', format: 'datetime' as const },
-  { key: 'deliveredBy', header: 'Delivered By' },
-  { key: 'actionTakenRemarks', header: 'Remarks' },
-  { key: 'soCustomerReferance', header: 'Customer Referance' },
-]
 
 /* ─── component ─── */
 export function SalesReportPage() {
@@ -122,23 +99,11 @@ export function SalesReportPage() {
 
   const handleExport = useCallback(async () => {
     if (filteredData.length === 0) return
-    await exportExcelOnDemand({
-      fileName: `Sales_Report_${fromDate}_to_${toDate}`,
-      title: 'Sales Report',
-      subtitle: `${fmtDateShort(fromDate)} to ${fmtDateShort(toDate)}`,
-      sheetName: 'Sales Report',
-      columns: EXCEL_COLUMNS,
-      data: filteredData as unknown as Record<string, unknown>[],
-      filters: [
-        ['Date Range', `${fmtDateShort(fromDate)} – ${fmtDateShort(toDate)}`],
-        ['Customer', selectedCustomerLabel || 'All'],
-      ],
-      summaryCards: [
-        ['Total Records', reportData.length],
-        ['Filtered Records', filteredData.length],
-        ['Unique Customers', uniqueCustomers],
-        ['Unique Statuses', uniqueStatuses],
-      ],
+    await exportSalesReportExcel({
+      rows: filteredData,
+      startDate: fromDate,
+      endDate: toDate,
+      customerLabel: selectedCustomerLabel,
     })
   }, [filteredData, fromDate, toDate, reportData.length, uniqueCustomers, uniqueStatuses, selectedCustomerLabel])
 
@@ -207,7 +172,7 @@ export function SalesReportPage() {
               <button
                 onClick={handleLoad}
                 disabled={loadingReport || !!dateError}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loadingReport && <Loader2 size={14} className="animate-spin" />}
                 {loadingReport ? 'Loading…' : 'Load Data'}
@@ -217,7 +182,7 @@ export function SalesReportPage() {
                 <button
                   onClick={handleExport}
                   disabled={filteredData.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <FileSpreadsheet size={14} />
                   Excel
@@ -225,7 +190,7 @@ export function SalesReportPage() {
                 <button
                   onClick={handleLoad}
                   disabled={loadingReport || !!dateError}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
                 >
                   <RefreshCw size={14} className={loadingReport ? 'animate-spin' : ''} />
                   Refresh

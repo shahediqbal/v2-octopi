@@ -9,6 +9,37 @@ import type {
   ApproveQuotationPayload,
 } from '@/types/quotation'
 
+type QuotationDetailEnvelope = QuotationDetail | { data?: QuotationDetail | null } | null | undefined
+
+function normalizeQuotationDetail(dataObj: QuotationDetailEnvelope): QuotationDetail | undefined {
+  if (!dataObj) {
+    return undefined
+  }
+
+  const detail = (
+    typeof dataObj === 'object' && 'data' in dataObj
+      ? dataObj.data
+      : dataObj
+  ) ?? undefined
+
+  if (!detail) {
+    return undefined
+  }
+
+  const master = detail.priceQuotationMasterData as typeof detail.priceQuotationMasterData & {
+    pqCustomerId?: number | null
+  }
+
+  return {
+    ...detail,
+    priceQuotationMasterData: {
+      ...detail.priceQuotationMasterData,
+      customerId: detail.priceQuotationMasterData.customerId ?? master.pqCustomerId ?? 0,
+    },
+    priceQuotationDetailList: detail.priceQuotationDetailList ?? [],
+  }
+}
+
 // ─────────────────── Query Keys ───────────────────
 
 export const quotationKeys = {
@@ -28,8 +59,8 @@ export function useQuotations(order: string) {
     queryKey: quotationKeys.list(order),
     queryFn: () =>
       apiClient
-        .get<ApiResponse<QuotationListItem[]>>(`/Price/GetQuotationsGrid/-1/${order}`)
-        .then((r) => r.dataObj ?? []),
+        .get<ApiResponse<{ data: QuotationListItem[] }>>(`/Price/GetQuotationsGrid/-1/${order}`)
+        .then((r) => r.dataObj?.data ?? []),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
   })
@@ -41,8 +72,8 @@ export function useQuotationDetail(id: number | undefined) {
     queryKey: quotationKeys.detail(id ?? 0),
     queryFn: () =>
       apiClient
-        .get<ApiResponse<QuotationDetail>>(`/Price/GetQuotationsDetails/${id}`)
-        .then((r) => r.dataObj),
+        .get<ApiResponse<QuotationDetail | { data?: QuotationDetail | null }>>(`/Price/GetQuotationsDetails/${id}`)
+        .then((r) => normalizeQuotationDetail(r.dataObj)),
     enabled: !!id && id > 0,
     staleTime: 30_000,
     gcTime: 5 * 60_000,

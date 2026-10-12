@@ -55,6 +55,72 @@ describe('stockInMappers', () => {
     })
   })
 
+  it('preserves numeric pack size values from detail responses', () => {
+    expect(
+      normalizeStockInPackForForm({
+        sipPackTypeId: 1,
+        sipPackSize: 10,
+        sipPackQty: 1,
+        sipPackRemarks: 'yuu',
+        packTypeName: 'POLY PACK',
+      }),
+    ).toEqual({
+      packId: undefined,
+      packDetails: '10 - yuu',
+      packQuantity: 1,
+      packTypeId: 1,
+      packTypeName: 'POLY PACK',
+      sipPackTypeId: 1,
+      sipPackSize: '10',
+      sipPackQty: 1,
+      sipPackRemarks: 'yuu',
+    })
+  })
+
+  it('does not backfill pack size from remarks when legacy size is missing', () => {
+    expect(
+      normalizeStockInPackForForm({
+        sipPackTypeId: 4,
+        sipPackSize: null,
+        sipPackQty: 8,
+        sipPackRemarks: 'Blue carton',
+        packTypeName: 'Carton',
+      }),
+    ).toEqual({
+      packId: undefined,
+      packDetails: 'Blue carton',
+      packQuantity: 8,
+      packTypeId: 4,
+      packTypeName: 'Carton',
+      sipPackTypeId: 4,
+      sipPackSize: null,
+      sipPackQty: 8,
+      sipPackRemarks: 'Blue carton',
+    })
+  })
+
+  it('does not backfill pack size from pack type when size and remarks are missing', () => {
+    expect(
+      normalizeStockInPackForForm({
+        sipPackTypeId: 4,
+        sipPackSize: null,
+        sipPackQty: 8,
+        sipPackRemarks: null,
+        packTypeName: 'Carton',
+      }),
+    ).toEqual({
+      packId: undefined,
+      packDetails: 'Carton',
+      packQuantity: 8,
+      packTypeId: 4,
+      packTypeName: 'Carton',
+      sipPackTypeId: 4,
+      sipPackSize: null,
+      sipPackQty: 8,
+      sipPackRemarks: null,
+    })
+  })
+
   it('maps form items back to a dual-compatible payload', () => {
     expect(
       mapStockInItemToPayload({

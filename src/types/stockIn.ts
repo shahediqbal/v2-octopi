@@ -48,7 +48,7 @@ export interface StockInPack {
   packTypeId?: number | null
   packTypeName?: string | null
   sipPackTypeId?: number | null
-  sipPackSize?: string | null
+  sipPackSize?: string | number | null
   sipPackQty?: number | null
   sipPackRemarks?: string | null
 }
@@ -142,6 +142,25 @@ export interface StockAdjustmentPayload {
   stockAdjutmentProducts: StockAdjustmentItem[]
 }
 
+export interface StockInLastPriceRequest {
+  productId: number
+  customerId: number | null
+  supplierId: number | null
+}
+
+export interface StockInLastPriceItem {
+  siSupplierId: number | null
+  siCustomerId: number | null
+  customerName: string | null
+  supplierName: string | null
+  productId: number
+  productName: string | null
+  sidConfirmedUnitPrice: number | null
+  siInvoiceDate: string | null
+  siInvoiceNo: string | null
+  lastSiSystemId: number | null
+}
+
 // ── Invoice / Challan ─────────────────────────────────────────
 export interface StockInInvoiceListRow {
   siSystemId: number
@@ -162,15 +181,22 @@ export interface StockInChallanItem {
   sidConfirmedQty: number | null
   sidDeclaredUnitPrice: number
   sidConfirmedUnitPrice: number | null
+
+  sidMappedProductId?: number | null
+  mappedProductName?: string | null
+  sidMappedProductName?: string | null
+
   packTypeName?: string | null
   sipPackSize?: number | string | null
   sipPackQty?: number | null
+
 }
 
 export interface StockInChallan {
   stockInGeneralData: StockInGeneralData
   stockInItemsData: StockInChallanItem[]
   stockInBillData: StockInBillData
+  notes?: string | null
 }
 
 // ── Payloads ──────────────────────────────────────────────────
@@ -194,6 +220,11 @@ export interface QuantityConfirmationItem {
   sidProductId: number
   sidConfirmedQty: number
   sidConfirmedUnitPrice: number
+
+  sidMappedProductId?: number | null
+  mappedProductName?: string | null
+  sidMappedProductName?: string | null
+
 }
 
 export interface RevertItem {
@@ -214,6 +245,7 @@ export interface StockInListFilters {
 export interface StockInInvoiceFilters {
   supplierId?: number
   customerId?: number
+  jobTypeId?: number
   startDate?: string
   endDate?: string
 }

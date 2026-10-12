@@ -6,7 +6,7 @@ import { Trash2, Plus, Layers, Package } from 'lucide-react'
 import type { StockInEditMode } from '@/types/stockIn'
 import type { StockInItemFormData, StockInBatchFormData, StockInPackFormData } from '@/schemas/stockInSchema'
 import { isEditable, isReadonly } from '@/features/stock-in/fieldRules'
-import { calculateLineTotal } from '@/features/stock-in/calculations'
+import { calculateLineTotal,calculateTotalQuantity  } from '@/features/stock-in/calculations'
 import { BatchModal } from '@/pages/stock-in/BatchModal'
 import { PackModal } from '@/pages/stock-in/PackModal'
 import {
@@ -177,7 +177,11 @@ export function StockInItemTable({
     const updated = (item.sidPacks ?? []).filter((_, i) => i !== packIndex)
     onItemChange(itemIndex, 'sidPacks', updated)
   }
-
+const totalQuantity = calculateTotalQuantity(items)
+const subtotal = items.reduce(
+  (sum, item) => sum + calculateLineTotal(item.sidDeclaredQty, item.sidDeclaredUnitPrice),
+  0,
+)
   return (
     <>
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -483,28 +487,35 @@ export function StockInItemTable({
             </tbody>
 
             {/* Footer Totals */}
-            {items.length > 0 && (
-              <tfoot className="border-t border-gray-200 bg-gray-50">
-                <tr>
-                  <td
-                    colSpan={showMappedProduct ? (productEditable ? 6 : 5) : productEditable ? 5 : 4}
-                    className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500"
-                  >
-                    Subtotal
-                  </td>
-                  <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                    {items
-                      .reduce(
-                        (sum, item) =>
-                          sum + calculateLineTotal(item.sidDeclaredQty, item.sidDeclaredUnitPrice),
-                        0,
-                      )
-                      .toFixed(4)}
-                  </td>
-                  <td colSpan={productEditable ? 3 : 2} />
-                </tr>
-              </tfoot>
-            )}
+           {/* Footer Totals */}
+{items.length > 0 && (
+  <tfoot className="border-t border-gray-200 bg-gray-50">
+    <tr>
+      <td
+        colSpan={showMappedProduct ? 3 : 2}
+        className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500"
+      >
+        Total Quantity
+      </td>
+
+      <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+        {totalQuantity.toFixed(4)}
+      </td>
+
+      {showConfirmedQty && <td />}
+
+      <td className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
+        Subtotal
+      </td>
+
+      <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+        {subtotal.toFixed(4)}
+      </td>
+
+      <td colSpan={productEditable ? 3 : 2} />
+    </tr>
+  </tfoot>
+)}
           </table>
         </div>
       </div>

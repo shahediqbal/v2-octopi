@@ -102,17 +102,18 @@ export function EditPurchasePricePage() {
         )}
 
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
-          <PurchasePriceForm
-            control={form.control}
-            errors={form.formState.errors}
-            isSubmitting={updateMutation.isPending}
-          />
+        <PurchasePriceForm
+          control={form.control}
+          errors={form.formState.errors}
+          isSubmitting={updateMutation.isPending}
+          selectedProductName={data.productName}
+        />
 
           <div className="mt-6 flex items-center gap-3">
             <button
               type="submit"
               disabled={updateMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
+              className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
             >
               {updateMutation.isPending && <Loader2 size={14} className="animate-spin" />}
               Update

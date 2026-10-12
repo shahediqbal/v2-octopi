@@ -172,7 +172,7 @@ export function AssignCustomersToEmployeePage() {
                   type="button"
                   onClick={handleReset}
                   disabled={!isDirty}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <RefreshCw size={13} /> Reset
                 </button>
@@ -180,7 +180,7 @@ export function AssignCustomersToEmployeePage() {
                   type="button"
                   onClick={handleAssign}
                   disabled={selectedUnassignedIds.length === 0}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gray-800 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="action-select inline-flex items-center gap-1.5 rounded-lg bg-gray-800 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <ArrowLeftRight size={13} /> Assign
                 </button>
@@ -221,7 +221,7 @@ export function AssignCustomersToEmployeePage() {
                   type="button"
                   onClick={handleRemove}
                   disabled={selectedAssignedIds.length === 0}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="action-delete inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <ArrowLeftRight size={13} /> Remove
                 </button>
@@ -229,7 +229,7 @@ export function AssignCustomersToEmployeePage() {
                   type="button"
                   onClick={handleUpdate}
                   disabled={updateAssignments.isPending || !selectedEmployeeId}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="action-update inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {updateAssignments.isPending ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                   Save

@@ -1,60 +1,76 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, ArrowLeft, GitCompareArrows, Loader2, Search } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, ChevronDown, GitCompareArrows, Loader2, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PaginatedCombobox } from '@/components/dropdowns'
 import {
   useMapProduct,
-  useMappedCandidateProducts,
   useMappedProductsForProduct,
-  useProductCategories,
-  useProductDetail,
+  useProducts,
 } from '@/hooks/useProducts'
+import type { ProductLookupOption } from '@/types/product'
+
+const EMPTY_ARRAY: ProductLookupOption[] = []
 
 export function ProductMappingPage() {
   const [targetProductId, setTargetProductId] = useState<number | null>(null)
-  const [categoryId, setCategoryId] = useState<number | null>(null)
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [mappedItems, setMappedItems] = useState<ProductLookupOption[]>([])
   const [search, setSearch] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
   const [serverError, setServerError] = useState('')
   const [savedOnce, setSavedOnce] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const { data: categories, isLoading: loadingCategories } = useProductCategories()
-  const { data: targetProduct } = useProductDetail(targetProductId ?? undefined)
-  const { data: candidates = [], isLoading: loadingCandidates, isError: candidatesError, error: candidateError } =
-    useMappedCandidateProducts(categoryId)
-  const { data: alreadyMapped = [] } = useMappedProductsForProduct(targetProductId)
+  const { data: allProducts = [], isLoading: loadingProducts } = useProducts()
+  const { data: alreadyMapped, isLoading: loadingMapped } = useMappedProductsForProduct(targetProductId)
+  const stableAlreadyMapped = alreadyMapped ?? EMPTY_ARRAY
   const mapMutation = useMapProduct()
 
+  // Pre-fill from already mapped when target changes
   useEffect(() => {
     if (!targetProductId) {
-      setCategoryId(null)
-      setSelectedIds([])
+      setMappedItems([])
       setSavedOnce(false)
+      setServerError('')
       return
     }
+    setMappedItems(stableAlreadyMapped)
+  }, [stableAlreadyMapped, targetProductId])
 
-    const nextCategoryId = targetProduct?.categoryId ?? targetProduct?.productCategoryId ?? null
-    if (nextCategoryId) setCategoryId(nextCategoryId)
-  }, [targetProduct, targetProductId])
-
+  // Close dropdown on outside click
   useEffect(() => {
-    if (!targetProductId) return
-    setSelectedIds(alreadyMapped.map((item) => item.id))
-  }, [alreadyMapped, targetProductId])
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
-  const filteredCandidates = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return candidates.filter((item) => {
-      if (item.id === targetProductId) return false
-      if (!query) return true
-      return item.label.toLowerCase().includes(query)
-    })
-  }, [candidates, search, targetProductId])
+  // All products as lookup options, excluding target, filtered by search
+  const filteredOptions = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return allProducts
+      .filter((p) => p.productId !== targetProductId)
+      .filter((p) => !q || p.productName.toLowerCase().includes(q))
+      .slice(0, 100)
+      .map((p) => ({ id: p.productId, label: p.productName }))
+  }, [allProducts, search, targetProductId])
 
-  const handleToggle = (productId: number) => {
-    setSelectedIds((current) =>
-      current.includes(productId) ? current.filter((id) => id !== productId) : [...current, productId],
-    )
+  const handleAddItem = (item: ProductLookupOption) => {
+    setMappedItems((prev) => (prev.some((p) => p.id === item.id) ? prev : [...prev, item]))
+    setSearch('')
+    setShowDropdown(false)
+  }
+
+  const handleRemove = (id: number) => setMappedItems((prev) => prev.filter((p) => p.id !== id))
+
+  const handleReset = () => {
+    setTargetProductId(null)
+    setMappedItems([])
+    setSearch('')
+    setServerError('')
+    setSavedOnce(false)
   }
 
   const handleSave = () => {
@@ -62,10 +78,9 @@ export function ProductMappingPage() {
       setServerError('Please select a target product')
       return
     }
-
     setServerError('')
     mapMutation.mutate(
-      { productId: targetProductId, mappedIds: selectedIds },
+      { productId: targetProductId, mappedIds: mappedItems.map((p) => p.id) },
       {
         onSuccess: (res) => {
           if (res.errMsg) setServerError(res.errMsg)
@@ -83,136 +98,132 @@ export function ProductMappingPage() {
           <ArrowLeft size={16} /> Back
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Product Mapping</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Select a target product and assign mapped products.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Map Control</h1>
+          <p className="mt-0.5 text-sm text-gray-500">Map a product</p>
         </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Target Product */}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Target Product *</label>
-            <PaginatedCombobox type="product" value={targetProductId} onValueChange={setTargetProductId} placeholder="Search product" />
+            <PaginatedCombobox
+              type="product"
+              value={targetProductId}
+              onValueChange={setTargetProductId}
+              placeholder="Search product"
+            />
           </div>
 
+          {/* Mapped With multi-select */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Category</label>
-            <select
-              value={categoryId ?? ''}
-              onChange={(event) => setCategoryId(event.target.value === '' ? null : Number(event.target.value))}
-              className={inputCls}
-              disabled={loadingCategories}
-            >
-              <option value="">Select category</option>
-              {categories?.map((category) => (
-                <option key={category.id} value={category.id}>{category.label}</option>
-              ))}
-            </select>
-          </div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Mapped With</label>
+            <div ref={dropdownRef} className="relative">
+              <button
+                type="button"
+                onClick={() => targetProductId && setShowDropdown((v) => !v)}
+                disabled={!targetProductId || loadingProducts}
+                className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-500 transition-colors hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                <span>{loadingProducts ? 'Loading…' : 'Add product to map'}</span>
+                <ChevronDown size={14} className="shrink-0 text-gray-400" />
+              </button>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Search Candidates</label>
-            <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search mapped candidates"
-                className={`${inputCls} pl-8`}
-                disabled={!categoryId}
-              />
+              {showDropdown && (
+                <div className="absolute z-30 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="border-b border-gray-100 p-2">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search…"
+                      className="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                    />
+                  </div>
+                  <ul className="max-h-60 overflow-y-auto py-1">
+                    {filteredOptions.length === 0 ? (
+                      <li className="px-4 py-3 text-sm text-gray-400">No products found</li>
+                    ) : (
+                      filteredOptions.map((opt) => (
+                        <li key={opt.id}>
+                          <button
+                            type="button"
+                            onClick={() => handleAddItem(opt)}
+                            className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 ${mappedItems.some((p) => p.id === opt.id) ? 'font-semibold text-green-700' : 'text-gray-800'}`}
+                          >
+                            {opt.label}
+                            {mappedItems.some((p) => p.id === opt.id) && <span className="ml-2 text-xs text-green-600">✓</span>}
+                          </button>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {serverError && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{serverError}</div>}
-        {savedOnce && !serverError && <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Mapping saved successfully.</div>}
-
-        {!targetProductId && (
+        {/* Selected (Mapped With) tags */}
+        {loadingMapped && targetProductId ? (
+          <div className="mt-4 flex items-center gap-2">
+            <Loader2 size={16} className="animate-spin text-gray-400" />
+            <span className="text-sm text-gray-500">Loading mapped products…</span>
+          </div>
+        ) : mappedItems.length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {mappedItems.map((item) => (
+              <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-800">
+                {item.label}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(item.id)}
+                  className="ml-0.5 rounded-full p-0.5 text-gray-500 hover:text-gray-900"
+                  aria-label={`Remove ${item.label}`}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : targetProductId ? (
+          <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-10 text-center">
+            <GitCompareArrows size={26} className="text-gray-300" />
+            <p className="mt-2 text-sm text-gray-500">No products mapped yet. Use the dropdown above to add.</p>
+          </div>
+        ) : (
           <div className="mt-6 flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-12 text-center">
             <GitCompareArrows size={28} className="text-gray-300" />
             <p className="mt-3 text-sm font-medium text-gray-700">Select a target product</p>
-            <p className="mt-1 text-sm text-gray-500">The matching category will be loaded automatically.</p>
+            <p className="mt-1 text-sm text-gray-500">Then add the products to map with it.</p>
           </div>
         )}
 
-        {targetProductId && loadingCandidates && (
-          <div className="mt-8 flex items-center justify-center py-12">
-            <Loader2 size={28} className="animate-spin text-gray-400" />
-            <span className="ml-3 text-sm text-gray-500">Loading mapped candidates…</span>
-          </div>
-        )}
+        {serverError && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{serverError}</div>}
+        {savedOnce && !serverError && <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Mapped successfully.</div>}
 
-        {candidatesError && (
-          <div className="mt-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
-            <AlertCircle size={20} className="mt-0.5 shrink-0 text-red-500" />
-            <div>
-              <p className="text-sm font-medium text-red-800">Failed to load mapped candidates</p>
-              <p className="mt-1 text-xs text-red-600">{(candidateError as Error)?.message}</p>
-            </div>
-          </div>
-        )}
-
-        {targetProductId && !loadingCandidates && !candidatesError && (
-          <div className="mt-6 space-y-4">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-              <span className="font-semibold text-gray-900">Target:</span> {targetProduct?.productName ?? `Product #${targetProductId}`}
-              {targetProduct?.productCategoryName && <span className="ml-2 text-gray-500">· {targetProduct.productCategoryName}</span>}
-            </div>
-
-            <div className="max-h-[520px] overflow-auto rounded-xl border border-gray-200">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
-                  <tr>
-                    <th className="px-4 py-3">Select</th>
-                    <th className="px-4 py-3">Product</th>
-                    <th className="px-4 py-3">ID</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredCandidates.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="px-4 py-10 text-center text-gray-400">No candidates found for this category.</td>
-                    </tr>
-                  ) : (
-                    filteredCandidates.map((candidate) => (
-                      <tr key={candidate.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(candidate.id)}
-                            onChange={() => handleToggle(candidate.id)}
-                            className="h-4 w-4 rounded border-gray-300 text-gray-800 focus:ring-gray-300"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-gray-800">{candidate.label}</td>
-                        <td className="px-4 py-3 text-gray-500">{candidate.id}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={mapMutation.isPending || !targetProductId}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {mapMutation.isPending && <Loader2 size={16} className="animate-spin" />}
-                Save Mapping
-              </button>
-              <p className="text-sm text-gray-500">{selectedIds.length} product(s) selected</p>
-            </div>
-          </div>
-        )}
+        <div className="mt-6 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={mapMutation.isPending || !targetProductId}
+            className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {mapMutation.isPending && <Loader2 size={16} className="animate-spin" />}
+            Map Product
+          </button>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="action-report rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            Reset
+          </button>
+          <p className="text-sm text-gray-500">{mappedItems.length} product(s) selected</p>
+        </div>
       </div>
     </div>
   )
 }
-
-const inputCls =
-  'block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-100 disabled:text-gray-500'

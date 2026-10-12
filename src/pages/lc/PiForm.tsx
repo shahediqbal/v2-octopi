@@ -11,7 +11,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { PiFormValues } from '@/schemas/lcTrackingSchema'
 import { PaginatedCombobox } from '@/components/dropdowns/PaginatedCombobox'
 import { DropdownSelect } from '@/components/dropdowns/DropdownSelect'
-import { usePiItemPrice } from '@/hooks/useLcTracking'
+import { usePiItemPrice, usePiNumbers } from '@/hooks/useLcTracking'
 import { formatCurrency } from '@/lib/utils'
 
 const INPUT =
@@ -170,6 +170,16 @@ export function PiForm({ control, errors, setValue, lockHeader }: PiFormProps) {
 
   const customerId = useWatch({ control, name: 'piCustmomerId' }) ?? 0
   const currency = useWatch({ control, name: 'piCurrency' }) ?? 'USD'
+  const mapWithExistingPi = useWatch({ control, name: 'mapWithExistingPi' }) ?? false
+
+  const { data: piNumbers = [], isFetching: loadingPiNumbers } = usePiNumbers(
+    customerId > 0 ? customerId : null,
+  )
+
+  // Clear piNumberMapped when checkbox is unchecked
+  useEffect(() => {
+    if (!mapWithExistingPi) setValue('piNumberMapped', null)
+  }, [mapWithExistingPi, setValue])
 
   const addRow = () =>
     append({
@@ -328,6 +338,54 @@ export function PiForm({ control, errors, setValue, lockHeader }: PiFormProps) {
             )}
           />
           {errors.lcPaymentTermsId && <p className={ERR_MSG}>{errors.lcPaymentTermsId.message}</p>}
+        </div>
+
+        {/* Map with Existing PI Number */}
+        <div className="sm:col-span-2">
+          <Controller
+            name="mapWithExistingPi"
+            control={control}
+            render={({ field }) => (
+              <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-red-600">
+                <input
+                  type="checkbox"
+                  checked={field.value}
+                  onChange={(e) => field.onChange(e.target.checked)}
+                  className="h-4 w-4 accent-red-600"
+                />
+                Map with Existing PI Number
+              </label>
+            )}
+          />
+          {mapWithExistingPi && (
+            <div className="mt-2">
+              <Controller
+                name="piNumberMapped"
+                control={control}
+                render={({ field }) => (
+                  <select
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value || null)}
+                    className={INPUT}
+                    disabled={loadingPiNumbers || customerId === 0}
+                  >
+                    <option value="">
+                      {customerId === 0
+                        ? 'Select a customer first'
+                        : loadingPiNumbers
+                          ? 'Loading...'
+                          : 'Select Mapped PI Number'}
+                    </option>
+                    {piNumbers.map((pi) => (
+                      <option key={pi.piSystemId} value={String(pi.piSystemId)}>
+                        {pi.piSystemId} - {pi.piNumber}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              />
+            </div>
+          )}
         </div>
 
         {/* Notes */}

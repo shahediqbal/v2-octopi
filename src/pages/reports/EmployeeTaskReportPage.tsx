@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, ClipboardList, Database, FileSpreadsheet, Loader2, RefreshCw, Search } from 'lucide-react'
 import { PaginatedCombobox } from '@/components/dropdowns'
 import { useEmployeeTaskSummary, useEmployeeTaskDetails } from '@/hooks/useEmployeeTask'
@@ -94,7 +94,7 @@ export function EmployeeTaskReportPage() {
   const detailsData = useMemo<EmployeeTaskDetailFlat[]>(
     () =>
       detailsRaw.flatMap((emp) =>
-        (emp.tasks ?? []).map((task) => ({
+        (emp.tasks ?? emp.Tasks ?? []).map((task) => ({
           ...task,
           employeeId: emp.employeeId,
           employeeCode: emp.employeeCode,
@@ -103,6 +103,12 @@ export function EmployeeTaskReportPage() {
       ),
     [detailsRaw],
   )
+
+  useEffect(() => {
+    if (activeTab === 'summary' && summaryData.length === 0 && detailsData.length > 0) {
+      setActiveTab('details')
+    }
+  }, [activeTab, detailsData.length, summaryData.length])
 
   const dateError = useMemo(() => {
     if (!fromDate || !toDate) return 'Both dates are required'
@@ -201,6 +207,7 @@ export function EmployeeTaskReportPage() {
 
   const isLoading = summaryLoading || detailsLoading
   const summaryNoData = summaryData.length === 0
+  const hasAnyData = summaryData.length > 0 || detailsData.length > 0
 
   return (
     <div className="space-y-6">
@@ -232,8 +239,8 @@ export function EmployeeTaskReportPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {summaryNoData ? (
-              <button onClick={handleLoad} disabled={isLoading || !!dateError} className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
+            {!hasAnyData ? (
+              <button onClick={handleLoad} disabled={isLoading || !!dateError} className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
                 {isLoading && <Loader2 size={14} className="animate-spin" />}
                 {isLoading ? 'Loading…' : 'Load Data'}
               </button>
@@ -242,11 +249,11 @@ export function EmployeeTaskReportPage() {
                 <button
                   onClick={activeTab === 'summary' ? handleExportSummary : handleExportDetails}
                   disabled={activeTab === 'summary' ? filteredSummary.length === 0 : filteredDetails.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <FileSpreadsheet size={14} />Excel
                 </button>
-                <button onClick={handleLoad} disabled={isLoading || !!dateError} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                <button onClick={handleLoad} disabled={isLoading || !!dateError} className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
                   <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />Refresh
                 </button>
               </>
@@ -259,14 +266,14 @@ export function EmployeeTaskReportPage() {
         {summaryError && <div className="mx-4 my-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700"><AlertCircle size={14} /> {(summaryErr as Error)?.message ?? 'Failed to load summary'}</div>}
         {detailsError && <div className="mx-4 my-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700"><AlertCircle size={14} /> {(detailsErr as Error)?.message ?? 'Failed to load details'}</div>}
 
-        {!isLoading && summaryNoData && !loadRequested && (
+        {!isLoading && !hasAnyData && !loadRequested && (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400"><ClipboardList size={28} /></div>
             <h2 className="text-lg font-semibold text-gray-900">No Data Loaded</h2>
             <p className="mt-1 max-w-sm text-sm text-gray-500">Select filters and click Load Data.</p>
           </div>
         )}
-        {!isLoading && loadRequested && summaryNoData && !summaryError && (
+        {!isLoading && loadRequested && !hasAnyData && !summaryError && !detailsError && (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400"><Database size={28} /></div>
             <h2 className="text-lg font-semibold text-gray-900">No Records Found</h2>
@@ -274,7 +281,7 @@ export function EmployeeTaskReportPage() {
           </div>
         )}
 
-        {(!summaryNoData || detailsData.length > 0) && (
+        {hasAnyData && (
           <>
             {/* Tabs */}
             <div className="flex border-b border-gray-200 px-4">

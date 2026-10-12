@@ -32,15 +32,18 @@ function fmtQty(value: number | null) {
 const EXCEL_COLUMNS = [
   { key: 'supplierId', header: 'Supplier ID', format: 'integer' as const },
   { key: 'supplierName', header: 'Supplier Name' },
-  { key: 'invoiceNo', header: 'Invoice No' },
+  { key: 'siCustomerId', header: 'Customer ID', format: 'integer' as const },
+  { key: 'customerName', header: 'Customer Name' },
+  { key: 'customerAddress', header: 'Customer Address' },
+  { key: 'siInvoiceNo', header: 'Invoice No' },
   { key: 'siSystemNo', header: 'SI System No' },
-  { key: 'invoiceDate', header: 'Invoice Date', format: 'date' as const },
+  { key: 'siInvoiceDate', header: 'Invoice Date', format: 'date' as const },
   { key: 'productId', header: 'Product ID', format: 'integer' as const },
   { key: 'productName', header: 'Product Name' },
   { key: 'batchNo', header: 'Batch No' },
   { key: 'batchProductionDate', header: 'Production Date', format: 'date' as const },
   { key: 'batchExpiryDate', header: 'Expiry Date', format: 'date' as const },
-  { key: 'receivedQty', header: 'Received Qty', format: 'number' as const },
+  { key: 'receiveQuantity', header: 'Received Qty', format: 'number' as const },
 ] as const
 
 export function StockInBatchReportPage() {
@@ -48,6 +51,8 @@ export function StockInBatchReportPage() {
   const [toDate, setToDate] = useState(todayStr)
   const [supplierId, setSupplierId] = useState<number | null>(null)
   const [supplierLabel, setSupplierLabel] = useState<string | null>(null)
+  const [customerId, setCustomerId] = useState<number | null>(null)
+  const [customerLabel, setCustomerLabel] = useState<string | null>(null)
   const [productId, setProductId] = useState<number | null>(null)
   const [productLabel, setProductLabel] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -58,9 +63,10 @@ export function StockInBatchReportPage() {
       startDate: fromDate,
       endDate: toDate,
       supplierId: supplierId ?? 0,
+      customerId: customerId ?? 0,
       productId: productId ?? 0,
     }),
-    [fromDate, toDate, supplierId, productId],
+    [fromDate, toDate, supplierId, customerId, productId],
   )
 
   const {
@@ -83,13 +89,20 @@ export function StockInBatchReportPage() {
     return reportData.filter(
       (item) =>
         item.supplierName?.toLowerCase().includes(q) ||
+        item.customerName?.toLowerCase().includes(q) ||
+        item.customerAddress?.toLowerCase().includes(q) ||
+        String(item.siCustomerId ?? '').includes(q) ||
         item.productName?.toLowerCase().includes(q) ||
         item.batchNo?.toLowerCase().includes(q) ||
-        item.invoiceNo?.toLowerCase().includes(q) ||
+        item.siInvoiceNo?.toLowerCase().includes(q) ||
         item.siSystemNo?.toLowerCase().includes(q),
     )
   }, [reportData, searchTerm])
 
+  const uniqueCustomers = useMemo(
+    () => new Set(reportData.filter((i) => i.siCustomerId).map((i) => i.siCustomerId)).size,
+    [reportData],
+  )
   const uniqueSuppliers = useMemo(
     () => new Set(reportData.filter((i) => i.supplierId).map((i) => i.supplierId)).size,
     [reportData],
@@ -99,7 +112,7 @@ export function StockInBatchReportPage() {
     [reportData],
   )
   const totalReceivedQty = useMemo(
-    () => reportData.reduce((s, i) => s + (i.receivedQty ?? 0), 0),
+    () => reportData.reduce((s, i) => s + (i.receiveQuantity ?? 0), 0),
     [reportData],
   )
 
@@ -121,17 +134,19 @@ export function StockInBatchReportPage() {
       filters: [
         ['Date Range', `${fmtDateShort(fromDate)} – ${fmtDateShort(toDate)}`],
         ['Supplier', supplierLabel || 'All'],
+        ['Customer', customerLabel || 'All'],
         ['Product', productLabel || 'All'],
       ],
       summaryCards: [
         ['Total Records', reportData.length],
         ['Filtered', filteredData.length],
+        ['Unique Customers', uniqueCustomers],
         ['Unique Suppliers', uniqueSuppliers],
         ['Unique Products', uniqueProducts],
         ['Total Received Qty', fmtQty(totalReceivedQty)],
       ],
     })
-  }, [filteredData, fromDate, toDate, supplierLabel, productLabel, reportData.length, uniqueSuppliers, uniqueProducts, totalReceivedQty])
+  }, [filteredData, fromDate, toDate, supplierLabel, customerLabel, productLabel, reportData.length, uniqueCustomers, uniqueSuppliers, uniqueProducts, totalReceivedQty])
 
   const noData = reportData.length === 0
 
@@ -154,31 +169,65 @@ export function StockInBatchReportPage() {
           </div>
           <div className="min-w-[200px] flex-1">
             <label className="mb-1 block text-xs font-medium text-gray-600">Supplier</label>
-            <PaginatedCombobox type="supplier" value={supplierId} onValueChange={(v, l) => { setSupplierId(v); setSupplierLabel(l ?? null); setLoadRequested(false) }} placeholder="All Suppliers" />
+            <PaginatedCombobox
+              type="supplier"
+              value={supplierId}
+              onValueChange={(value) => {
+                setSupplierId(value)
+                setLoadRequested(false)
+              }}
+              onLabelChange={setSupplierLabel}
+              selectedLabel={supplierLabel}
+              placeholder="All Suppliers"
+            />
+          </div>
+          <div className="min-w-[200px] flex-1">
+            <label className="mb-1 block text-xs font-medium text-gray-600">Customer</label>
+            <PaginatedCombobox
+              type="customer"
+              value={customerId}
+              onValueChange={(value) => {
+                setCustomerId(value)
+                setLoadRequested(false)
+              }}
+              onLabelChange={setCustomerLabel}
+              selectedLabel={customerLabel}
+              placeholder="All Customers"
+            />
           </div>
           <div className="min-w-[200px] flex-1">
             <label className="mb-1 block text-xs font-medium text-gray-600">Product</label>
-            <PaginatedCombobox type="product" value={productId} onValueChange={(v, l) => { setProductId(v); setProductLabel(l ?? null); setLoadRequested(false) }} placeholder="All Products" />
+            <PaginatedCombobox
+              type="product"
+              value={productId}
+              onValueChange={(value) => {
+                setProductId(value)
+                setLoadRequested(false)
+              }}
+              onLabelChange={setProductLabel}
+              selectedLabel={productLabel}
+              placeholder="All Products"
+            />
           </div>
           <div className="min-w-[160px]">
             <label className="mb-1 block text-xs font-medium text-gray-600">Search</label>
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" placeholder="Supplier, product, batch…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${inputCls} pl-8`} />
+              <input type="text" placeholder="Supplier, customer, product, batch…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`${inputCls} pl-8`} />
             </div>
           </div>
           <div className="flex items-center gap-2">
             {noData ? (
-              <button onClick={handleLoad} disabled={isLoading || !!dateError} className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
+              <button onClick={handleLoad} disabled={isLoading || !!dateError} className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
                 {isLoading && <Loader2 size={14} className="animate-spin" />}
                 {isLoading ? 'Loading…' : 'Load Data'}
               </button>
             ) : (
               <>
-                <button onClick={handleExport} disabled={filteredData.length === 0} className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
+                <button onClick={handleExport} disabled={filteredData.length === 0} className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50">
                   <FileSpreadsheet size={14} />Excel
                 </button>
-                <button onClick={handleLoad} disabled={isLoading || !!dateError} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                <button onClick={handleLoad} disabled={isLoading || !!dateError} className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
                   <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />Refresh
                 </button>
               </>
@@ -194,7 +243,7 @@ export function StockInBatchReportPage() {
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400"><PackagePlus size={28} /></div>
             <h2 className="text-lg font-semibold text-gray-900">No Data Loaded</h2>
-            <p className="mt-1 max-w-sm text-sm text-gray-500">Select filters and click Load Data.</p>
+            <p className="mt-1 max-w-sm text-sm text-gray-500">Choose any supplier, customer, product, and date combination, then click Load Data.</p>
           </div>
         )}
         {!isLoading && loadRequested && noData && !isError && (
@@ -208,9 +257,10 @@ export function StockInBatchReportPage() {
         {!noData && (
           <>
             <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-6">
                 <StatCard label="Total Records" value={String(reportData.length)} />
                 <StatCard label="Filtered" value={String(filteredData.length)} />
+                <StatCard label="Unique Customers" value={String(uniqueCustomers)} />
                 <StatCard label="Unique Suppliers" value={String(uniqueSuppliers)} />
                 <StatCard label="Unique Products" value={String(uniqueProducts)} />
                 <StatCard label="Total Received Qty" value={fmtQty(totalReceivedQty)} accent />
@@ -221,10 +271,10 @@ export function StockInBatchReportPage() {
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Supplier</th>
-                    <th className="px-4 py-3 font-semibold">Invoice No</th>
                     <th className="px-4 py-3 font-semibold">SI System No</th>
                     <th className="px-4 py-3 font-semibold">Invoice Date</th>
+                    <th className="px-4 py-3 font-semibold">Supplier</th>
+                    <th className="px-4 py-3 font-semibold">Customer</th>
                     <th className="px-4 py-3 font-semibold">Product</th>
                     <th className="px-4 py-3 font-semibold">Batch No</th>
                     <th className="px-4 py-3 font-semibold">Production Date</th>
@@ -238,15 +288,25 @@ export function StockInBatchReportPage() {
                   ) : (
                     filteredData.map((item, idx) => (
                       <tr key={idx} className="transition-colors hover:bg-gray-50">
-                        <td className="px-4 py-2.5 text-gray-700">{item.supplierName || '-'}</td>
-                        <td className="px-4 py-2.5 text-gray-600">{item.invoiceNo || '-'}</td>
                         <td className="px-4 py-2.5 text-gray-600">{item.siSystemNo || '-'}</td>
-                        <td className="px-4 py-2.5 text-gray-600">{fmtDate(item.invoiceDate)}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{fmtDate(item.siInvoiceDate)}</td>
+                        <td className="px-4 py-2.5 text-gray-700">{item.supplierName || '-'}</td>
+                        <td className="px-4 py-2.5 text-gray-700">
+                          <div className="font-medium text-gray-900">{item.customerName || '-'}</div>
+                          {item.siCustomerId != null && (
+                            <div className="text-xs text-gray-500">ID: {item.siCustomerId}</div>
+                          )}
+                          {item.customerAddress && (
+                            <div className="max-w-[220px] truncate text-xs text-gray-500" title={item.customerAddress}>
+                              {item.customerAddress}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-2.5 font-medium text-gray-900">{item.productName || '-'}</td>
                         <td className="px-4 py-2.5 text-gray-600">{item.batchNo || '-'}</td>
                         <td className="px-4 py-2.5 text-gray-600">{fmtDate(item.batchProductionDate)}</td>
                         <td className="px-4 py-2.5 text-gray-600">{fmtDate(item.batchExpiryDate)}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums font-medium text-emerald-700">{fmtQty(item.receivedQty)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium text-emerald-700">{fmtQty(item.receiveQuantity)}</td>
                       </tr>
                     ))
                   )}

@@ -7,7 +7,8 @@ import { CreditDetailsModal } from '@/pages/sales-orders/review-cockpit/CreditDe
 
 interface CreditSectionProps {
   customerId: number | null
-  orderValue: number
+  /** When omitted the Current Order and New Closing Balance rows are hidden */
+  orderValue?: number
   orderNumber?: string | number
 }
 
@@ -26,7 +27,7 @@ export function CreditSection({ customerId, orderValue, orderNumber }: CreditSec
   const totalPayment = toNumber(row?.totalPaid)
   const totalAdjustment = toNumber(row?.totalAdjustment)
   const closingBalance = toNumber(row?.totalDue)
-  const newClosing = closingBalance + orderValue
+  const newClosing = orderValue !== undefined ? closingBalance + orderValue : null
 
   return (
     <SectionCard
@@ -53,21 +54,25 @@ export function CreditSection({ customerId, orderValue, orderNumber }: CreditSec
             <Row label="Total Payment" value={toCurrency(totalPayment)} />
             <Row label="Total Adjustment" value={toCurrency(totalAdjustment)} />
             <Row label="Closing Balance" value={toCurrency(closingBalance)} bold />
-            <tr className="bg-blue-50">
-              <td className="px-4 py-2.5 text-gray-800">
-                Current Order
-                {orderNumber && (
-                  <span className="ml-2 inline-flex rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">
-                    #{orderNumber}
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{toCurrency(orderValue)}</td>
-            </tr>
-            <tr className="bg-green-50">
-              <td className="px-4 py-2.5 font-semibold text-gray-800">New Closing Balance</td>
-              <td className="px-4 py-2.5 text-right font-bold text-gray-900">{toCurrency(newClosing)}</td>
-            </tr>
+            {orderValue !== undefined && (
+              <>
+                <tr className="bg-blue-50">
+                  <td className="px-4 py-2.5 text-gray-800">
+                    Current Order
+                    {orderNumber && (
+                      <span className="ml-2 inline-flex rounded-full bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                        #{orderNumber}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{toCurrency(orderValue)}</td>
+                </tr>
+                <tr className="bg-green-50">
+                  <td className="px-4 py-2.5 font-semibold text-gray-800">New Closing Balance</td>
+                  <td className="px-4 py-2.5 text-right font-bold text-gray-900">{toCurrency(newClosing!)}</td>
+                </tr>
+              </>
+            )}
           </tbody>
         </table>
       </div>

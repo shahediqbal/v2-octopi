@@ -15,6 +15,9 @@ export interface UsePaginatedListOptions {
   extraParams?: Record<string, string | number | boolean | null | undefined>
 }
 
+/** Sentinel value meaning "fetch page 1 first to discover totalPages, then fetch the last page" */
+const LAST_PAGE_SENTINEL = -1
+
 export function normalizePaginatedResponse<T>(
   dataObj: PaginatedResponse<T> | T[] | null | undefined,
   pageNumber: number,
@@ -52,37 +55,59 @@ export function usePaginatedList<T>({
   extraParams,
 }: UsePaginatedListOptions) {
   const resolvedPageSize = pageSize ?? endpointConfig.pageSize
+  const reversePages = endpointConfig.sortDesc === true
+
+  function applyClientSort(items: T[]): T[] {
+    if (!endpointConfig.clientSortKey) return items
+    const key = endpointConfig.clientSortKey as string
+    return [...items].sort((a, b) => {
+      const aVal = Number((a as Record<string, unknown>)[key] ?? 0)
+      const bVal = Number((b as Record<string, unknown>)[key] ?? 0)
+      return bVal - aVal
+    })
+  }
+
+  function transformAndSort(raw: T[]): T[] {
+    const transformed = endpointConfig.transformItems
+      ? (endpointConfig.transformItems(raw as unknown[]) as T[])
+      : raw
+    return applyClientSort(transformed)
+  }
 
   return useInfiniteQuery({
     queryKey,
-    queryFn: async ({ pageParam = 1 }) => {
-      const currentPage = typeof pageParam === 'number' ? pageParam : Number(pageParam) || 1
-      const url = buildPaginatedUrl(
-        endpointConfig,
-        currentPage,
-        resolvedPageSize,
-        searchTerm,
-        extraParams,
-      )
+    queryFn: async ({ pageParam }) => {
+      const isSentinel = pageParam === LAST_PAGE_SENTINEL
 
-      const response = await apiClient.get<
-        DropdownApiResponse<PaginatedResponse<T> | T[]>
-      >(url)
+      if (isSentinel) {
+        /* ── Step 1: probe page 1 to learn totalPages ── */
+        const probeUrl = buildPaginatedUrl(endpointConfig, 1, resolvedPageSize, searchTerm, extraParams)
+        const probeRes = await apiClient.get<DropdownApiResponse<PaginatedResponse<T> | T[]>>(probeUrl)
+        const probe = normalizePaginatedResponse(probeRes.dataObj, 1, resolvedPageSize)
 
-      const normalized = normalizePaginatedResponse(response.dataObj, currentPage, resolvedPageSize)
+        if (probe.totalPages <= 1) {
+          /* only one page — return it directly */
+          return { ...probe, data: transformAndSort(probe.data) }
+        }
 
-      return {
-        ...normalized,
-        data: endpointConfig.transformItems
-          ? (endpointConfig.transformItems(normalized.data as unknown[]) as T[])
-          : normalized.data,
+        /* ── Step 2: fetch the actual last page ── */
+        const lastUrl = buildPaginatedUrl(endpointConfig, probe.totalPages, resolvedPageSize, searchTerm, extraParams)
+        const lastRes = await apiClient.get<DropdownApiResponse<PaginatedResponse<T> | T[]>>(lastUrl)
+        const last = normalizePaginatedResponse(lastRes.dataObj, probe.totalPages, resolvedPageSize)
+        return { ...last, data: transformAndSort(last.data) }
       }
+
+      /* ── Normal / subsequent page fetch ── */
+      const currentPage = typeof pageParam === 'number' ? pageParam : Number(pageParam) || 1
+      const url = buildPaginatedUrl(endpointConfig, currentPage, resolvedPageSize, searchTerm, extraParams)
+      const response = await apiClient.get<DropdownApiResponse<PaginatedResponse<T> | T[]>>(url)
+      const normalized = normalizePaginatedResponse(response.dataObj, currentPage, resolvedPageSize)
+      return { ...normalized, data: transformAndSort(normalized.data) }
     },
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) =>
-      lastPage.pageNumber < lastPage.totalPages
-        ? lastPage.pageNumber + 1
-        : undefined,
+    initialPageParam: reversePages ? LAST_PAGE_SENTINEL : 1,
+    getNextPageParam: reversePages
+      ? (lastPage) => (lastPage.pageNumber > 1 ? lastPage.pageNumber - 1 : undefined)
+      : (lastPage) => (lastPage.pageNumber < lastPage.totalPages ? lastPage.pageNumber + 1 : undefined),
     staleTime,
     gcTime,
     refetchOnWindowFocus,

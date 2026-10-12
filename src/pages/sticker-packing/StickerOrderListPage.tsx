@@ -4,15 +4,13 @@ import { Loader2, Package, PackageSearch, AlertCircle } from 'lucide-react'
 import { useStickerOrders } from '@/hooks/useStickerPacking'
 
 const ORDER_TYPES = [
-  { value: 0, label: 'All' },
-  { value: 2, label: 'Active' },
-  { value: 4, label: 'Packaged' },
-  { value: 5, label: 'Packed' },
+  { value: 2, label: 'Package Pending' },
+  { value: 3, label: 'Package Edit' },
 ]
 
 export function StickerOrderListPage() {
   const navigate = useNavigate()
-  const [orderType, setOrderType] = useState(5)
+  const [orderType, setOrderType] = useState(2)
   const [search, setSearch] = useState('')
 
   const { data: orders = [], isLoading, isError } = useStickerOrders(orderType)
@@ -108,21 +106,25 @@ export function StickerOrderListPage() {
                     <td className="px-4 py-3 text-gray-500">{order.jobType}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/sticker-packing/${order.soSystemId}/define`)}
-                          className="flex items-center gap-1 rounded-md bg-gray-800 px-2.5 py-1 text-xs font-medium text-white hover:bg-gray-700"
-                        >
-                          <Package size={12} />
-                          Define
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/sticker-packing/${order.soSystemId}/edit`)}
-                          className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          Edit
-                        </button>
+                        {orderType === 2 && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/sticker-packing/${order.soSystemId}/define`)}
+                            className="action-select flex items-center gap-1 rounded-md bg-gray-800 px-2.5 py-1 text-xs font-medium text-white hover:bg-gray-700"
+                          >
+                            <Package size={12} />
+                            Packaging
+                          </button>
+                        )}
+                        {orderType === 3 && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/sticker-packing/${order.soSystemId}/edit`)}
+                            className="flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            Edit
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

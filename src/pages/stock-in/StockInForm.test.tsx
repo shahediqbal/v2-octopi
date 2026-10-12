@@ -17,11 +17,81 @@ vi.mock('@/hooks/useStockIn', () => ({
     ],
     isLoading: false,
   }),
+  useStockInLast3Price: (
+    filters: { productId: number; supplierId: number | null; customerId: number | null },
+    enabled: boolean,
+  ) => ({
+    data:
+      enabled && filters.productId === 13 && filters.supplierId === 9 && filters.customerId == null
+        ? [
+            {
+              siSupplierId: 9,
+              siCustomerId: null,
+              customerName: null,
+              supplierName: 'Asuchem',
+              productId: 13,
+              productName: 'ASUDEL OLIVE GWL',
+              sidConfirmedUnitPrice: 1800,
+              siInvoiceDate: '2025-11-09T11:38:46.553',
+              siInvoiceNo: 'CH-152030',
+              lastSiSystemId: 801,
+            },
+            {
+              siSupplierId: 9,
+              siCustomerId: null,
+              customerName: null,
+              supplierName: 'Asuchem',
+              productId: 13,
+              productName: 'ASUDEL OLIVE GWL',
+              sidConfirmedUnitPrice: 1610,
+              siInvoiceDate: '2023-10-29T18:00:00',
+              siInvoiceNo: '033169',
+              lastSiSystemId: 619,
+            },
+            {
+              siSupplierId: 9,
+              siCustomerId: null,
+              customerName: null,
+              supplierName: 'Asuchem',
+              productId: 13,
+              productName: 'ASUDEL OLIVE GWL',
+              sidConfirmedUnitPrice: 1610,
+              siInvoiceDate: '2023-10-24T18:00:00',
+              siInvoiceNo: '033087',
+              lastSiSystemId: 527,
+            },
+          ]
+        : [],
+    isLoading: false,
+    isError: false,
+  }),
 }))
 
 vi.mock('@/components/dropdowns', () => ({
-  PaginatedCombobox: ({ placeholder = 'combobox' }: { placeholder?: string }) => (
-    <button type="button">{placeholder}</button>
+  PaginatedCombobox: ({
+    type,
+    placeholder = 'combobox',
+    selectedLabel,
+    onValueChange,
+    onLabelChange,
+  }: {
+    type?: string
+    placeholder?: string
+    selectedLabel?: string | null
+    onValueChange?: (value: number | null) => void
+    onLabelChange?: (label: string | null) => void
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        if (type === 'product') {
+          onValueChange?.(13)
+          onLabelChange?.('ASUDEL OLIVE GWL')
+        }
+      }}
+    >
+      {selectedLabel ?? placeholder}
+    </button>
   ),
 }))
 
@@ -90,6 +160,46 @@ describe('StockInForm bill summary', () => {
 
     await waitFor(() => {
       expect(getNumberInput('Final Total').value).toBe('22')
+    })
+  })
+
+  it('shows the last 3 purchase prices for the selected product', async () => {
+    const onSubmit = vi.fn()
+    const defaultValues: Partial<StockInFormData> = {
+      siInvoiceNo: 'INV-002',
+      siInvoiceDate: '2026-04-23',
+      siJobTypeId: 1,
+      jobTypeName: 'Regular_Purchase',
+      siSourceChannelId: 1,
+      siSourceChannelName: 'Main Channel',
+      siDestinationChannelId: 2,
+      siDestinationChannelName: 'Secondary Channel',
+      siSupplierId: 9,
+      supplierName: 'Asuchem',
+      items: [],
+    }
+
+    render(
+      <StockInForm
+        mode="standard"
+        defaultValues={defaultValues}
+        onSubmit={onSubmit}
+        isSubmitting={false}
+        submitLabel="Create Stock-In Order"
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search product to add...' }))
+    fireEvent.change(getNumberInput('Unit Price'), { target: { value: '1700' } })
+
+    await waitFor(() => {
+      expect(screen.getByText('Purchase price signal')).toBeTruthy()
+      expect(screen.getByText('Supplier: Asuchem')).toBeTruthy()
+      expect(screen.getByText('1,673.33')).toBeTruthy()
+      expect(screen.getByText('Stock-In #801')).toBeTruthy()
+      expect(screen.getByText('Stock-In #619')).toBeTruthy()
+      expect(screen.getByText('Stock-In #527')).toBeTruthy()
+      expect(screen.getAllByText('-5.56% vs latest').length).toBe(2)
     })
   })
 })

@@ -3,7 +3,7 @@ import { AlertCircle, CalendarRange, Database, FileSpreadsheet, Loader2, Refresh
 import { PaginatedCombobox } from '@/components/dropdowns'
 import { useMonthlyCreditReport } from '@/hooks/useMonthlyCreditReport'
 import { exportExcelOnDemand } from '@/utils/lazyExportExcel'
-import type { MonthlyCreditFilters } from '@/types/monthlyCreditReport'
+import type { MonthlyCreditFilters, MonthlyCreditItem, MonthlyCreditLastTransactions } from '@/types/monthlyCreditReport'
 
 function todayStr() {
   const d = new Date()
@@ -21,6 +21,80 @@ function fmtDateShort(value: string) {
 function fmtAmount(value: number | null) {
   if (value == null) return '-'
   return value.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function hasLegacyMonthlyShape(item: MonthlyCreditItem) {
+  return typeof item.monthlyValues === 'object' && item.monthlyValues !== null && !Array.isArray(item.monthlyValues)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function formatHeader(key: string) {
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())
+}
+
+function renderMetricValue(value: unknown) {
+  if (typeof value === 'number') return fmtAmount(value)
+  if (typeof value === 'string' && value) return value
+  return '-'
+}
+
+function renderDateValue(value: unknown) {
+  if (typeof value === 'string' && value) return fmtDateShort(value)
+  return '-'
+}
+
+function renderKeyValueLines(entries: [string, string][]) {
+  if (entries.length === 0) return '-'
+
+  return (
+    <div className="min-w-[18rem] space-y-1.5">
+      {entries.map(([label, value]) => (
+        <div key={label} className="flex items-start justify-between gap-3 text-xs">
+          <span className="text-gray-500">{label}</span>
+          <span className="text-right font-medium text-gray-700">{value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function renderLastTransactions(value: MonthlyCreditLastTransactions) {
+  const entries: [string, string][] = [
+    ['Last Sale Amount', renderMetricValue(value.lastSaleAmount)],
+    ['Last Sale Date', renderDateValue(value.lastSaleDate)],
+    ['Last Payment Amount', renderMetricValue(value.lastPaymentAmount)],
+    ['Last Payment Date', renderDateValue(value.lastPaymentDate)],
+    ['Days Since Payment', value.daysSinceLastPayment != null ? String(value.daysSinceLastPayment) : '-'],
+    ['Days Since Last Sale', value.daysSinceLastSale != null ? String(value.daysSinceLastSale) : '-'],
+    ['Payment Status', value.paymentStatus ?? '-'],
+  ]
+
+  return renderKeyValueLines(entries)
+}
+
+function renderCellValue(key: string, value: unknown) {
+  if (value == null) return '-'
+
+  if (key === 'monthlyValues' && isRecord(value)) {
+    return renderKeyValueLines(
+      Object.entries(value).map(([label, amount]) => [label, renderMetricValue(amount)]),
+    )
+  }
+
+  if (key === 'lastTransactions' && isRecord(value)) {
+    return renderLastTransactions(value as MonthlyCreditLastTransactions)
+  }
+
+  if (isRecord(value)) {
+    return renderKeyValueLines(
+      Object.entries(value).map(([label, entryValue]) => [formatHeader(label), String(entryValue ?? '-')]),
+    )
+  }
+
+  return String(value)
 }
 
 export function MonthlyCreditReportPage() {
@@ -51,9 +125,13 @@ export function MonthlyCreditReportPage() {
       (item) =>
         item.employeeName?.toLowerCase().includes(q) ||
         item.monthName?.toLowerCase().includes(q) ||
-        item.monthYear?.toLowerCase().includes(q),
+        item.monthYear?.toLowerCase().includes(q) ||
+        item.marketingName?.toLowerCase().includes(q) ||
+        item.customerName?.toLowerCase().includes(q),
     )
   }, [reportData, searchTerm])
+
+  const hasLegacyExportShape = useMemo(() => reportData.some(hasLegacyMonthlyShape), [reportData])
 
   const uniqueEmployees = useMemo(() => new Set(filteredData.map((i) => i.employeeId)).size, [filteredData])
   const totalCredit = useMemo(() => filteredData.reduce((s, i) => s + (i.creditAmount ?? 0), 0), [filteredData])
@@ -72,13 +150,22 @@ export function MonthlyCreditReportPage() {
       .filter((k) => k !== '__proto__')
       .map((key) => ({
         key,
-        header: key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()),
+        header: formatHeader(key),
         ...(typeof firstRow[key] === 'number' ? { format: 'number' as const } : {}),
       }))
   }, [reportData])
 
   const handleExport = useCallback(async () => {
+    if (reportData.length === 0) return
+
+    if (hasLegacyExportShape) {
+      const { exportMonthlyCreditReportExcel } = await import('@/utils/exportMonthlyCreditReportExcel')
+      await exportMonthlyCreditReportExcel(reportData, fromDate, toDate, employeeId ?? 0)
+      return
+    }
+
     if (filteredData.length === 0 || excelColumns.length === 0) return
+
     await exportExcelOnDemand({
       fileName: `Monthly_Credit_Report_${fromDate}_to_${toDate}`,
       title: 'Monthly Credit Report',
@@ -97,7 +184,18 @@ export function MonthlyCreditReportPage() {
         ['Total Credit', fmtAmount(totalCredit)],
       ],
     })
-  }, [filteredData, excelColumns, fromDate, toDate, employeeLabel, reportData.length, uniqueEmployees, totalCredit])
+  }, [
+    employeeId,
+    employeeLabel,
+    excelColumns,
+    filteredData,
+    fromDate,
+    hasLegacyExportShape,
+    reportData,
+    toDate,
+    totalCredit,
+    uniqueEmployees,
+  ])
 
   // Table headers from first row
   const tableKeys = useMemo(() => {
@@ -162,7 +260,7 @@ export function MonthlyCreditReportPage() {
               <button
                 onClick={handleLoad}
                 disabled={isLoading || !!dateError}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading && <Loader2 size={14} className="animate-spin" />}
                 {isLoading ? 'Loading…' : 'Load Data'}
@@ -171,8 +269,8 @@ export function MonthlyCreditReportPage() {
               <>
                 <button
                   onClick={handleExport}
-                  disabled={filteredData.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={hasLegacyExportShape ? reportData.length === 0 : filteredData.length === 0}
+                  className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <FileSpreadsheet size={14} />
                   Excel
@@ -180,7 +278,7 @@ export function MonthlyCreditReportPage() {
                 <button
                   onClick={handleLoad}
                   disabled={isLoading || !!dateError}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                  className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
                 >
                   <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
                   Refresh
@@ -252,7 +350,7 @@ export function MonthlyCreditReportPage() {
                 <tr>
                   {tableKeys.map((key) => (
                     <th key={key} className="px-4 py-3 font-semibold">
-                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}
+                      {formatHeader(key)}
                     </th>
                   ))}
                 </tr>
@@ -268,8 +366,8 @@ export function MonthlyCreditReportPage() {
                   filteredData.map((item, idx) => (
                     <tr key={idx} className="transition-colors hover:bg-gray-50">
                       {tableKeys.map((key) => (
-                        <td key={key} className="px-4 py-2.5 text-gray-700">
-                          {item[key] != null ? String(item[key]) : '-'}
+                        <td key={key} className="align-top px-4 py-2.5 text-gray-700">
+                          {renderCellValue(key, item[key])}
                         </td>
                       ))}
                     </tr>

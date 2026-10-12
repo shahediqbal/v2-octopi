@@ -1,7 +1,7 @@
 // ============================================================
 // Stock-In — Shared List Page (standard / confirm-qty / admin-approved / price-update)
 // ============================================================
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, Eye, Loader2, Plus, Search, Send } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useStockInList, useEscalateStockIn } from '@/hooks/useStockIn'
@@ -98,6 +98,15 @@ export function StockInListPage({ mode = 'standard' }: StockInListPageProps) {
   const [viewStockInId, setViewStockInId] = useState<number | null>(null)
   const [mutationError, setMutationError] = useState<string>()
 
+  // Reset search when navigating between stock-in modes (e.g. standard → admin-approved)
+  // Without this, a stale search term from a previous route causes "No orders found"
+  // (same pattern as SalesOrderListPage)
+  useEffect(() => {
+    setSearch('')
+    setSelectedIds(new Set())
+    setViewStockInId(null)
+  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const filtered = filterRows(sortedRows, search)
 
   function toggleSelect(id: number) {
@@ -145,7 +154,7 @@ export function StockInListPage({ mode = 'standard' }: StockInListPageProps) {
         {mode === 'standard' && (
           <Link
             to="/stock-in/create"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            className="action-insert inline-flex items-center gap-1.5 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
             <Plus className="h-4 w-4" />
             New Stock-In
@@ -170,7 +179,7 @@ export function StockInListPage({ mode = 'standard' }: StockInListPageProps) {
             type="button"
             disabled={selectedIds.size === 0}
             onClick={() => setShowEscalateConfirm(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="action-select inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
             title={selectedIds.size === 0 ? 'Select one or more orders to escalate' : `Escalate ${selectedIds.size} order(s)`}
           >
             <Send className="h-4 w-4" />
@@ -280,14 +289,14 @@ export function StockInListPage({ mode = 'standard' }: StockInListPageProps) {
                         <button
                           type="button"
                           onClick={() => setViewStockInId(row.siSystemId)}
-                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          className="action-view inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           View
                         </button>
                         <Link
                           to={getEditPath(mode, row.siSystemId)}
-                          className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                         >
                           {getEditLabel(mode)}
                         </Link>

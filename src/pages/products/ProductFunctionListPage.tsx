@@ -26,7 +26,7 @@ export function ProductFunctionListPage() {
           </div>
         </div>
 
-        <Link to="/products/functions/add" className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700">
+        <Link to="/products/functions/add" className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700">
           <Plus size={16} /> Add Function
         </Link>
       </div>
@@ -88,7 +88,7 @@ export function ProductFunctionListPage() {
                       <td className="px-5 py-3 text-center">
                         <Link
                           to={`/products/functions/${item.functionId}/edit`}
-                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                          className="action-update inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                         >
                           <Pencil size={12} /> Edit
                         </Link>

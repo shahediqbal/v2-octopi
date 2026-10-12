@@ -40,6 +40,8 @@ const EXCEL_COLUMNS = [
   { key: 'jobType', header: 'Type Of Sales' },
   { key: 'sodProductId', header: 'Product Id', format: 'integer' as const },
   { key: 'productName', header: 'Product Name' },
+  { key: 'mappedProductId', header: 'Mapped Id', format: 'integer' as const },
+  { key: 'mappedProductName', header: 'Mapped Name' },
   { key: 'sodConfirmedQty', header: 'Sold Quantity', format: 'number' as const },
   { key: 'sodConfirmedUnitPrice', header: 'Unit Price', format: 'number' as const },
   { key: 'soCurrentStatus', header: 'Work Pending Id', format: 'integer' as const },
@@ -211,7 +213,7 @@ export function ProductOutReportPage() {
               <button
                 onClick={handleLoad}
                 disabled={isLoading || !!dateError}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isLoading && <Loader2 size={14} className="animate-spin" />}
                 {isLoading ? 'Loading…' : 'Load Data'}
@@ -221,7 +223,7 @@ export function ProductOutReportPage() {
                 <button
                   onClick={() => void handleExport()}
                   disabled={filteredData.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <FileSpreadsheet size={14} />
                   Excel
@@ -229,7 +231,7 @@ export function ProductOutReportPage() {
                 <button
                   onClick={handleLoad}
                   disabled={isLoading || !!dateError}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
                 >
                   <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
                   Refresh
@@ -315,6 +317,8 @@ export function ProductOutReportPage() {
                   <th className="px-4 py-3 font-semibold">Invoice Date</th>
                   <th className="px-4 py-3 font-semibold">Customer</th>
                   <th className="px-4 py-3 font-semibold">Product</th>
+                  <th className="px-4 py-3 font-semibold">Mapped Id</th>
+                  <th className="px-4 py-3 font-semibold">Mapped Name</th>
                   <th className="px-4 py-3 font-semibold text-right">Sold Qty</th>
                   <th className="px-4 py-3 font-semibold text-right">Unit Price</th>
                 </tr>
@@ -322,7 +326,7 @@ export function ProductOutReportPage() {
               <tbody className="divide-y divide-gray-100">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                    <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
                       No data found matching your search
                     </td>
                   </tr>
@@ -338,6 +342,8 @@ export function ProductOutReportPage() {
                       <td className="px-4 py-2.5 text-gray-600">{fmtDate(item.invoiceDate)}</td>
                       <td className="px-4 py-2.5 text-gray-700">{item.customerName ?? '-'}</td>
                       <td className="px-4 py-2.5 text-gray-700">{item.productName ?? '-'}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{item.mappedProductId ?? '-'}</td>
+                      <td className="px-4 py-2.5 text-gray-700">{item.mappedProductName ?? '-'}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{item.sodConfirmedQty ?? '-'}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{item.sodConfirmedUnitPrice ?? '-'}</td>
                     </tr>

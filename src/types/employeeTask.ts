@@ -19,7 +19,8 @@ export interface EmployeeTaskDetailResponse {
   employeeId: number
   employeeCode: string
   employeeFullName: string
-  tasks: EmployeeTask[]
+  tasks?: EmployeeTask[]
+  Tasks?: EmployeeTask[]
 }
 
 export interface EmployeeTask {

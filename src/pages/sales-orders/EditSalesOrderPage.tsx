@@ -202,7 +202,7 @@ export function EditSalesOrderPage({ mode = 'standard' }: EditSalesOrderPageProp
               type="button"
               onClick={handlePackagingSubmit}
               disabled={updatePackagingMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {updatePackagingMutation.isPending && <Loader2 size={16} className="animate-spin" />}
               Update packaging
@@ -216,6 +216,10 @@ export function EditSalesOrderPage({ mode = 'standard' }: EditSalesOrderPageProp
             isSubmitting={updateMutation.isPending || adminUpdateMutation.isPending || adminSubmitPackagingMutation.isPending}
             submitLabel={getSubmitLabel(mode)}
             serverError={serverError}
+            headerLabels={{
+              customerName: detail?.stockOutGeneralData.customerName,
+              supplierName: detail?.stockOutGeneralData.supplierName,
+            }}
           />
         )}
       </div>

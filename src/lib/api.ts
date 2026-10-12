@@ -22,10 +22,53 @@ function getFirstValidationMessage(errors: unknown): string | null {
   return null
 }
 
+// function getBodyMessage(body: unknown): string | null {
+//   if (typeof body === 'string') {
+//     const normalized = body.trim()
+//     return normalized.length > 0 ? normalized : null
+//   }
+
+//   if (!body || typeof body !== 'object') {
+//     return null
+//   }
+
+//   const response = body as {
+//     errMsg?: unknown
+//     message?: unknown
+//      detail?: unknown
+//     title?: unknown
+//     errors?: unknown
+//   }
+
+//   if (typeof response.errMsg === 'string' && response.errMsg.trim().length > 0) {
+//     return response.errMsg
+//   }
+
+//   if (typeof response.message === 'string' && response.message.trim().length > 0) {
+//     return response.message
+//   }
+
+//   const validationMessage = getFirstValidationMessage(response.errors)
+//   if (validationMessage) {
+//     return validationMessage
+//   }
+
+//   if (typeof response.title === 'string' && response.title.trim().length > 0) {
+//     return response.title
+//   }
+
+//   try {
+//     return JSON.stringify(body)
+//   } catch {
+//     return null
+//   }
+// }
 function getBodyMessage(body: unknown): string | null {
   if (typeof body === 'string') {
     const normalized = body.trim()
-    return normalized.length > 0 ? normalized : null
+    return normalized.length > 0
+      ? normalized
+      : null
   }
 
   if (!body || typeof body !== 'object') {
@@ -35,24 +78,45 @@ function getBodyMessage(body: unknown): string | null {
   const response = body as {
     errMsg?: unknown
     message?: unknown
+    detail?: unknown
     title?: unknown
     errors?: unknown
   }
 
-  if (typeof response.errMsg === 'string' && response.errMsg.trim().length > 0) {
+  if (
+    typeof response.errMsg === 'string' &&
+    response.errMsg.trim().length > 0
+  ) {
     return response.errMsg
   }
 
-  if (typeof response.message === 'string' && response.message.trim().length > 0) {
+  if (
+    typeof response.message === 'string' &&
+    response.message.trim().length > 0
+  ) {
     return response.message
   }
 
-  const validationMessage = getFirstValidationMessage(response.errors)
+  const validationMessage =
+    getFirstValidationMessage(
+      response.errors,
+    )
+
   if (validationMessage) {
     return validationMessage
   }
 
-  if (typeof response.title === 'string' && response.title.trim().length > 0) {
+  if (
+    typeof response.detail === 'string' &&
+    response.detail.trim().length > 0
+  ) {
+    return response.detail
+  }
+
+  if (
+    typeof response.title === 'string' &&
+    response.title.trim().length > 0
+  ) {
     return response.title
   }
 
@@ -106,7 +170,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
     // If the token is expired or invalid, clear it and redirect to sign-in
     if (response.status === 401 && getAccessToken()) {
       logoutFromBridge()
-      window.location.href = '/signin'
+      // Use history API so React Router picks up the navigation without a full reload
+      window.history.replaceState(null, '', '/signin')
+      window.dispatchEvent(new PopStateEvent('popstate'))
     }
     throw new ApiError(response.status, response.statusText, body)
   }
@@ -135,5 +201,13 @@ export const apiClient = {
     fetch(`${env.apiBaseUrl}${url}`, {
       method: 'DELETE',
       headers: authHeaders(),
+    }).then(handleResponse<T>),
+}
+export const aiApiClient = {
+  post: <T>(url: string, data: unknown) =>
+    fetch(`${env.aiApiBaseUrl}${url}`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
     }).then(handleResponse<T>),
 }

@@ -1,28 +1,57 @@
 import { useMemo, useState } from 'react'
-import { Search, Loader2, AlertCircle } from 'lucide-react'
+import { Search, Loader2, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { useCustomers, useUpdateCustomerFlag } from '@/hooks/useCustomers'
+
+type SortCol = 'id' | 'name' | 'flag'
+type SortDir = 'asc' | 'desc' | 'none'
 
 export function CustomerFlagUpdatePage() {
   const [search, setSearch] = useState('')
+  const [sortCol, setSortCol] = useState<SortCol | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>('none')
   const { data: customers = [], isLoading, isError } = useCustomers()
   const { mutate: updateFlag } = useUpdateCustomerFlag()
 
+  function cycleSort(col: SortCol) {
+    if (sortCol !== col) {
+      setSortCol(col)
+      setSortDir('asc')
+    } else {
+      setSortDir((prev) => (prev === 'none' ? 'asc' : prev === 'asc' ? 'desc' : 'none'))
+    }
+  }
+
+  function sortIcon(col: SortCol) {
+    if (sortCol !== col || sortDir === 'none') return <ArrowUpDown size={13} className="text-gray-400" />
+    return sortDir === 'asc'
+      ? <ArrowUp size={13} className="text-gray-900" />
+      : <ArrowDown size={13} className="text-gray-900" />
+  }
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    return customers.filter(
+    const list = customers.filter(
       (c) =>
         c.customerName.toLowerCase().includes(q) ||
         c.customerId.toString().includes(q),
     )
-  }, [customers, search])
+    if (!sortCol || sortDir === 'none') return list
+    return [...list].sort((a, b) => {
+      let cmp = 0
+      if (sortCol === 'id') cmp = a.customerId - b.customerId
+      else if (sortCol === 'name') cmp = a.customerName.localeCompare(b.customerName)
+      else if (sortCol === 'flag') cmp = (a.customerFlag ?? 0) - (b.customerFlag ?? 0)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [customers, search, sortCol, sortDir])
 
   return (
     <div className="space-y-6">
       {/* header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Customer Flag Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Flag for Batch Showing</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Toggle the active status for each customer.
+          Flag Customer to show Batch info in the Challan
         </p>
       </div>
 
@@ -61,9 +90,25 @@ export function CustomerFlagUpdatePage() {
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700 w-24">ID</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Customer Name</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700 w-28">Active</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700 w-24">
+                  <button type="button" onClick={() => cycleSort('id')} className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 hover:bg-gray-100 transition-colors">
+                    ID {sortIcon('id')}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                  <button type="button" onClick={() => cycleSort('name')} className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 hover:bg-gray-100 transition-colors">
+                    Customer Name {sortIcon('name')}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-700 w-36">
+                  <button
+                    type="button"
+                    onClick={() => cycleSort('flag')}
+                    className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 hover:bg-gray-100 transition-colors"
+                  >
+                    Active {sortIcon('flag')}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">

@@ -2,10 +2,120 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Loader2, AlertCircle, Save, ArrowLeft, PackageOpen } from 'lucide-react'
 import { useStickerPackingDetail, usePackTypes, useUpdateStickerPacking } from '@/hooks/useStickerPacking'
-import { useDropdown } from '@/hooks/useDropdown'
+import { useEmployeeOptions } from '@/hooks/useEmployees'
 import { PackingItemRow } from '@/components/sticker-packing/PackingItemRow'
 import { useToastStore } from '@/stores/toastStore'
 import type { PackingItem } from '@/types/stickerPacking'
+
+interface StickerPackingRowValue extends PackingItem {
+  delete?: 1
+}
+
+function parsePackingNumber(value: number | string | null | undefined) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function formatPackingNumber(value: number) {
+  return value.toFixed(4)
+}
+
+function calculatePackQuantity(packSize: number | string, packNo: number | string) {
+  return formatPackingNumber(parsePackingNumber(packSize) * parsePackingNumber(packNo))
+}
+
+function hasPackingValues(row: StickerPackingRowValue) {
+  return Boolean(row.packSize || row.packNo || row.packQuantity || row.sopPackId || row.packedBy)
+}
+
+function createSplitRow(
+  row: StickerPackingRowValue,
+  options: { preserveSelections?: boolean } = {},
+): StickerPackingRowValue {
+  return {
+    index: `${row.productId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    productId: row.productId,
+    productName: row.productName,
+    quantity: row.quantity,
+    packSize: '',
+    packNo: '',
+    packQuantity: '',
+    sopPackId: options.preserveSelections ? row.sopPackId : null,
+    packedBy: options.preserveSelections ? row.packedBy : null,
+    delete: 1,
+  }
+}
+
+function rebalanceStickerRows(rows: StickerPackingRowValue[], changedIndex: string) {
+  const changedRow = rows.find((row) => row.index === changedIndex)
+  if (!changedRow) return rows
+
+  if (parsePackingNumber(changedRow.packQuantity) > changedRow.quantity + 0.0001) {
+    return rows.map((row) =>
+      row.index === changedIndex
+        ? { ...row, packSize: '', packNo: '', packQuantity: '' }
+        : row,
+    )
+  }
+
+  const productRows = rows.filter((row) => row.productId === changedRow.productId)
+  const totalPacked = productRows.reduce((sum, row) => sum + parsePackingNumber(row.packQuantity), 0)
+  const remaining = changedRow.quantity - totalPacked
+  const hasEmptySplit = productRows.some((row) => row.delete === 1 && !row.packSize && !row.packNo)
+
+  if (remaining > 0.0001 && !hasEmptySplit) {
+    const insertIndex = rows.findIndex((row) => row.index === changedIndex)
+    const nextRows = [...rows]
+    nextRows.splice(insertIndex + 1, 0, createSplitRow(changedRow, { preserveSelections: true }))
+    return nextRows
+  }
+
+  if (remaining <= 0.0001) {
+    return rows.filter(
+      (row) => !(row.productId === changedRow.productId && row.delete === 1 && !row.packSize && !row.packNo),
+    )
+  }
+
+  return rows
+}
+
+function updateStickerRow(rows: StickerPackingRowValue[], index: string, updates: Partial<PackingItem>) {
+  const nextRows = rows.map((row) => {
+    if (row.index !== index) return row
+
+    const updated: StickerPackingRowValue = { ...row, ...updates }
+    if ('packSize' in updates || 'packNo' in updates) {
+      updated.packQuantity = calculatePackQuantity(updated.packSize, updated.packNo)
+    }
+
+    return updated
+  })
+
+  return rebalanceStickerRows(nextRows, index)
+}
+
+function removeStickerRow(rows: StickerPackingRowValue[], index: string) {
+  const target = rows.find((row) => row.index === index)
+  if (!target) return rows
+
+  const filtered = rows.filter((row) => row.index !== index)
+  if (target.delete === 1 && !hasPackingValues(target)) {
+    return filtered
+  }
+
+  const productRows = filtered.filter((row) => row.productId === target.productId)
+  if (productRows.length === 0) {
+    return filtered
+  }
+
+  const totalPacked = productRows.reduce((sum, row) => sum + parsePackingNumber(row.packQuantity), 0)
+  const hasEmptySplit = productRows.some((row) => row.delete === 1 && !hasPackingValues(row))
+  if (totalPacked < target.quantity - 0.0001 && !hasEmptySplit) {
+    return [...filtered, createSplitRow(target, { preserveSelections: true })]
+  }
+
+  return filtered
+}
 
 export function EditPackingPage() {
   const { id } = useParams<{ id: string }>()
@@ -15,11 +125,9 @@ export function EditPackingPage() {
 
   const { data: detail, isLoading, isError } = useStickerPackingDetail(soSystemId)
   const { data: packTypes = [], isLoading: loadingPackTypes } = usePackTypes()
-  const { data: employeeOptions = [] } = useDropdown('employeebychannel')
+  const { data: employees = [] } = useEmployeeOptions()
   const updateMutation = useUpdateStickerPacking()
-
-  const employees = employeeOptions.map((e) => ({ id: e.key, label: e.value }))
-  const [items, setItems] = useState<PackingItem[]>([])
+  const [items, setItems] = useState<StickerPackingRowValue[]>([])
 
   useEffect(() => {
     if (!detail) return
@@ -39,11 +147,11 @@ export function EditPackingPage() {
   }, [detail])
 
   function handleChange(index: string, updates: Partial<PackingItem>) {
-    setItems((prev) => prev.map((it) => (it.index === index ? { ...it, ...updates } : it)))
+    setItems((prev) => updateStickerRow(prev, index, updates))
   }
 
   function handleDelete(index: string) {
-    setItems((prev) => prev.filter((it) => it.index !== index))
+    setItems((prev) => removeStickerRow(prev, index))
   }
 
   function handleSubmit() {
@@ -54,9 +162,8 @@ export function EditPackingPage() {
     }
 
     updateMutation.mutate(
-      {
-        soSystemId,
-        stockOutPackagingItems: items.map((it) => ({
+      items.map((it) => ({
+          soSystemId,
           sopProductId: it.productId,
           sopPackSize: Number(it.packSize),
           sopNoPack: Number(it.packNo),
@@ -64,7 +171,6 @@ export function EditPackingPage() {
           sopPackId: it.sopPackId,
           packedBy: it.packedBy,
         })),
-      },
       {
         onSuccess: () => {
           showToast({ message: 'Packing updated successfully', type: 'success' })
@@ -173,7 +279,7 @@ export function EditPackingPage() {
             type="button"
             onClick={handleSubmit}
             disabled={updateMutation.isPending || items.length === 0}
-            className="flex items-center gap-1.5 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            className="action-update flex items-center gap-1.5 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
           >
             {updateMutation.isPending ? (
               <Loader2 size={14} className="animate-spin" />

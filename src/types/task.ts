@@ -108,6 +108,16 @@ export interface TaskDetailApiResponse {
 
 // ─── Assigned task list row from GET /Task/GetAssignedTaskList ───────────────
 
+// export interface AssignedTaskListRow {
+//   taskId: number
+//   taskName: string | null
+//   empFirstName: string | null
+//   empLastName: string | null
+//   taskDestination: string | null
+//   taskDestinationAddress: string | null
+//   taskAssignTime?: string | null
+// }
+
 export interface AssignedTaskListRow {
   taskId: number
   taskName: string | null
@@ -116,8 +126,14 @@ export interface AssignedTaskListRow {
   taskDestination: string | null
   taskDestinationAddress: string | null
   taskAssignTime?: string | null
-}
 
+  // Backend may return one or more of these for delivered/completed task status
+  taskStatus?: string | null
+  taskStatusId?: number | null
+  taskEndTime?: string | null
+  delivered?: string | null
+  deliveredTime?: string | null
+}
 export interface AssignedTaskListApiResponse {
   statusCode: number
   message: string
@@ -196,12 +212,17 @@ export interface DeliveryTaskListApiResponse {
 export interface AddTransportPayload {
   taskId: number
   taskTransportationVehicleId: number
+  /** Local cache label used by the delivery page after add/edit; not required by the API. */
+  vehicleName?: string
   taskTransportationCost: number
   taskTransportationStartLat: number
   taskTransportationStartLong: number
   taskTransportationEndLat: number | null
   taskTransportationEndLong: number | null
+  /** Local cache ids used by the delivery page after add/edit; not required by the API. */
+  taskTransportationStartLocationId?: number | null
   taskTransportationStartLocation: string
+  taskTransportationEndLocationId?: number | null
   taskTransportationEndLocation: string
   taskTransportationRemarks?: string
 }
@@ -211,12 +232,17 @@ export interface UpdateTransportPayload {
   taskId: number
   taskTransportationAutoId: number
   taskTransportationVehicleId: number
+  /** Local cache label used by the delivery page after add/edit; not required by the API. */
+  vehicleName?: string
   taskTransportationCost: number
   taskTransportationStartLat: number
   taskTransportationStartLong: number
   taskTransportationEndLat: number | null
   taskTransportationEndLong: number | null
+  /** Local cache ids used by the delivery page after add/edit; not required by the API. */
+  taskTransportationStartLocationId?: number | null
   taskTransportationStartLocation: string
+  taskTransportationEndLocationId?: number | null
   taskTransportationEndLocation: string
   taskTransportationRemarks?: string
 }

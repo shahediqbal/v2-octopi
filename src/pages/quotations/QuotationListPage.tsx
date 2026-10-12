@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Download, Loader2, AlertCircle, Eye, Pencil, FileCheck, FileText } from 'lucide-react'
+import { Plus, Download, Loader2, AlertCircle, Eye, Pencil, FileCheck, FileText, Search } from 'lucide-react'
 import { useQuotations } from '@/hooks/useQuotation'
 import { formatDate } from '@/lib/utils'
 import { exportExcelOnDemand } from '@/utils/lazyExportExcel'
@@ -28,6 +28,36 @@ export function QuotationListPage({ mode }: QuotationListPageProps) {
   const { data: quotations = [], isLoading, isError, error } = useQuotations(order)
   const [viewId, setViewId] = useState<number | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const filteredQuotations = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) {
+      return quotations
+    }
+
+    return quotations.filter((quotation) => {
+      const haystack = [
+        quotation.pqSystemId,
+        quotation.pqSystemNo,
+        quotation.customerName,
+        quotation.customerAddress,
+        quotation.pqOrderDate,
+        quotation.pqOrderDate ? formatDate(quotation.pqOrderDate) : '',
+      ]
+        .filter((value) => value != null && String(value).trim() !== '')
+        .join(' ')
+        .toLowerCase()
+
+      return haystack.includes(query)
+    })
+  }, [quotations, search])
+
+  const countLabel = isLoading
+    ? 'Loading…'
+    : search.trim()
+      ? `${filteredQuotations.length} of ${quotations.length} quotation${quotations.length !== 1 ? 's' : ''}`
+      : `${quotations.length} quotation${quotations.length !== 1 ? 's' : ''}`
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -40,7 +70,7 @@ export function QuotationListPage({ mode }: QuotationListPageProps) {
           { header: 'Customer', key: 'customerName', width: 35 },
           { header: 'Date', key: 'pqOrderDate', width: 18 },
         ],
-        rows: quotations.map((q) => ({
+        rows: filteredQuotations.map((q) => ({
           ...q,
           pqOrderDate: q.pqOrderDate ? formatDate(q.pqOrderDate) : '',
         })),
@@ -57,26 +87,37 @@ export function QuotationListPage({ mode }: QuotationListPageProps) {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{modeLabel(mode)}</h1>
           <p className="mt-1 text-sm text-gray-500">
-            {isLoading ? 'Loading…' : `${quotations.length} quotation${quotations.length !== 1 ? 's' : ''}`}
+            {countLabel}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleExport}
-            disabled={isExporting || isLoading}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+            disabled={isExporting || isLoading || filteredQuotations.length === 0}
+            className="action-report inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
           >
             {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
             Export
           </button>
           <Link
             to="/quotations/create"
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
+            className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
           >
             <Plus size={15} /> New Quotation
           </Link>
         </div>
+      </div>
+
+      <div className="relative max-w-xl">
+        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search anything in quotations..."
+          className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-9 pr-4 text-sm text-gray-700 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+        />
       </div>
 
       {/* Tab links */}
@@ -134,17 +175,17 @@ export function QuotationListPage({ mode }: QuotationListPageProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {quotations.length === 0 ? (
+                {filteredQuotations.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-5 py-12 text-center">
                       <div className="flex flex-col items-center gap-2 text-gray-400">
                         <FileText size={24} className="text-gray-300" />
-                        <span>No quotations found.</span>
+                        <span>{search.trim() ? 'No matching quotations found.' : 'No quotations found.'}</span>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  quotations.map((q, idx) => (
+                  filteredQuotations.map((q, idx) => (
                     <tr key={q.pqSystemId} className="transition-colors hover:bg-gray-50/50">
                       <td className="px-5 py-3 text-gray-400">{idx + 1}</td>
                       <td className="px-5 py-3 font-medium text-gray-900">{q.pqSystemNo}</td>
@@ -157,13 +198,13 @@ export function QuotationListPage({ mode }: QuotationListPageProps) {
                           <button
                             type="button"
                             onClick={() => setViewId(q.pqSystemId)}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-view inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <Eye size={12} /> View
                           </button>
                           <Link
                             to={`/quotations/${q.pqSystemId}/edit`}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-update inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <Pencil size={12} /> Edit
                           </Link>

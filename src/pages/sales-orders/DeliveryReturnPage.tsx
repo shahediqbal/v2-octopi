@@ -270,7 +270,7 @@ export function DeliveryReturnPage() {
                 type="button"
                 onClick={() => void handleRestore()}
                 disabled={restoreMutation.isPending || previewItems.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="action-delete inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {restoreMutation.isPending && <Loader2 size={16} className="animate-spin" />}
                 Revert Inventory

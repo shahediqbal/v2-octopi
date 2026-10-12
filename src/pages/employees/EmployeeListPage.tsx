@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { AlertCircle, Loader2, Search } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { AlertCircle, Loader2, Pencil, Plus, Search, UserX } from 'lucide-react'
 import { useDebounce } from '@/hooks/useDebounce'
-import { usePaginatedEmployees } from '@/hooks/useEmployees'
+import { usePaginatedEmployees, useDeactivateEmployee } from '@/hooks/useEmployees'
 import type { Employee } from '@/types/employee'
 
 function formatEmployeeName(employee: Employee) {
@@ -11,8 +12,10 @@ function formatEmployeeName(employee: Employee) {
 }
 
 export function EmployeeListPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 300)
+  const deactivateMutation = useDeactivateEmployee()
 
   const {
     data,
@@ -45,13 +48,28 @@ export function EmployeeListPage() {
     [fetchNextPage, hasNextPage, isFetchingNextPage],
   )
 
+  const handleDeactivate = (employee: Employee) => {
+    if (!employee.employeeCode) return
+    if (!window.confirm(`Deactivate "${[employee.empFirstName, employee.empLastName].filter(Boolean).join(' ')}"?`)) return
+    deactivateMutation.mutate(employee.employeeCode)
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {totalRecords > 0 ? `${totalRecords} total employees` : isLoading ? 'Loading…' : 'No employees'}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {totalRecords > 0 ? `${totalRecords} total employees` : isLoading ? 'Loading…' : 'No employees'}
+          </p>
+        </div>
+        <Link
+          to="/employees/add"
+          className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
+        >
+          <Plus size={16} />
+          Add New
+        </Link>
       </div>
 
       <div className="relative max-w-md">
@@ -96,12 +114,13 @@ export function EmployeeListPage() {
                   <th className="px-5 py-3">Permanent Address</th>
                   <th className="px-5 py-3">Joining Date</th>
                   <th className="px-5 py-3">Department</th>
+                  <th className="px-5 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {employees.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-12 text-center text-gray-400">
+                    <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
                       {search ? 'No matching employees found.' : 'No employees yet.'}
                     </td>
                   </tr>
@@ -118,8 +137,29 @@ export function EmployeeListPage() {
                       <td className="px-5 py-3 text-gray-700">{employee.empContactNo ?? '—'}</td>
                       <td className="max-w-[220px] truncate px-5 py-3 text-gray-600">{employee.empPresentAddress ?? '—'}</td>
                       <td className="max-w-[220px] truncate px-5 py-3 text-gray-600">{employee.empParmanentAddress ?? '—'}</td>
-                      <td className="px-5 py-3 text-gray-600">{employee.dateOfJoining ?? '—'}</td>
-                      <td className="px-5 py-3 text-gray-600">{employee.departmentId ?? '—'}</td>
+                      <td className="px-5 py-3 text-gray-600">{employee.dateOfJoining ? employee.dateOfJoining.split('T')[0] : '—'}</td>
+                      <td className="px-5 py-3 text-gray-600">{employee.departmentName ?? employee.departmentId ?? '—'}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/employees/${employee.employeeId}/edit`)}
+                            className="action-update inline-flex items-center justify-center rounded-lg border border-gray-200 p-1.5 text-gray-600 hover:bg-gray-100 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeactivate(employee)}
+                            disabled={!employee.employeeCode || deactivateMutation.isPending}
+                            className="action-delete inline-flex items-center justify-center rounded-lg border border-red-200 p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            title="Deactivate"
+                          >
+                            <UserX size={14} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}

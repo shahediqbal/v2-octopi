@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { jwtDecode } from 'jwt-decode'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,17 @@ import { AppToast } from '@/components/AppToast'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import type { LegacyMenuItem } from '@/types/auth'
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[320px] items-center justify-center py-16">
+      <div className="flex items-center gap-3 text-sm text-gray-500">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+        Loading page…
+      </div>
+    </div>
+  )
+}
 
 export function AppShell() {
   const [apiMenus, setApiMenus] = useState<LegacyMenuItem[]>([])
@@ -80,7 +91,9 @@ export function AppShell() {
               {menuError}
             </div>
           )}
-          <Outlet />
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
 

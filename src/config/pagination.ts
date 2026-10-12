@@ -10,6 +10,10 @@ export interface PaginatedEndpointConfig {
   searchParam?: string
   staticParams?: Record<string, PaginationParamValue>
   transformItems?: (items: unknown[]) => unknown[]
+  /** Send sortOrder=desc to the backend and sort each loaded page descending client-side */
+  sortDesc?: boolean
+  /** Field name to sort by client-side (string comparison, Z→A). Applied after transformItems. */
+  clientSortKey?: string
 }
 
 export const PAGINATED_LIST_ENDPOINTS = {
@@ -17,27 +21,37 @@ export const PAGINATED_LIST_ENDPOINTS = {
     endpoint: '/Customer/GetAllCustomerListPagination',
     pageSize: 50,
     searchParam: 'searchTerm',
+    sortDesc: true,
+    clientSortKey: 'customerId',
   },
   employee: {
     endpoint: '/Employee/GetEmployeeListPagination',
     pageSize: 50,
     searchParam: 'searchTerm',
+    sortDesc: true,
+    clientSortKey: 'employeeId',
   },
   product: {
     endpoint: '/Product/GetProductListPagination',
     pageSize: 50,
     searchParam: 'searchTerm',
+    sortDesc: true,
+    clientSortKey: 'productId',
   },
   supplier: {
     endpoint: '/Supplier/GetSupplierListPagination',
     pageSize: 50,
     searchParam: 'searchTerm',
+    sortDesc: true,
+    clientSortKey: 'supplierId',
   },
   location: {
     endpoint: '/KeyValue/GetDropdown',
     pageSize: 50,
     searchParam: 'searchTerm',
     staticParams: { type: 'location' },
+    sortDesc: true,
+    clientSortKey: 'locationId',
     transformItems: (items) =>
       items.map((item) => {
         const location = item as {
@@ -55,11 +69,14 @@ export const PAGINATED_LIST_ENDPOINTS = {
     endpoint: '/CustomerPayment/GetChequeInfoGridPagination',
     pageSize: 50,
     searchParam: 'searchTerm',
+    sortDesc: true,
+    clientSortKey: 'chequeInfoId',
   },
   stockInOrderLazy: {
     endpoint: '/StockIn/StockInOrderGridDataLazy/52',
     pageSize: 50,
     searchParam: 'searchTerm',
+    sortDesc: true,
   },
 } as const satisfies Record<string, PaginatedEndpointConfig>
 
@@ -151,6 +168,10 @@ export function buildPaginatedUrl(
 
   if (searchTerm.trim()) {
     params.set(config.searchParam ?? 'searchTerm', searchTerm.trim())
+  }
+
+  if (config.sortDesc) {
+    params.set('sortOrder', 'desc')
   }
 
   return `${config.endpoint}?${params.toString()}`

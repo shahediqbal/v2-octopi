@@ -321,7 +321,7 @@ export function StockAdjustmentPage() {
           <button
             type="submit"
             disabled={adjustMutation.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {adjustMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Submit Adjustment

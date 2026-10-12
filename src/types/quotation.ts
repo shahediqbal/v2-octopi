@@ -26,9 +26,9 @@ export interface QuotationMaster {
   pqSystemNo: string
   customerId: number
   customerName: string
-  customerAddress: string
+  customerAddress: string | null
   pqOrderDate: string
-  pqCurrencyName: string                // "BDT" | "USD"
+  pqCurrencyName: string | null                // "BDT" | "USD"
 }
 
 export interface QuotationLineItem {
@@ -42,6 +42,15 @@ export interface QuotationLineItem {
   pqdCalculatedPrice: number
   pqdAdustedAmount: number               // NOTE: backend typo "Adusted"
   pqdFinalPrice: number
+  productCategoryName?: string | null
+  functionName?: string | null
+  groupName?: string | null
+  hsCode?: string | null
+  brandName?: string | null
+  countryOfOrigin?: string | null
+  productLevel?: string | null
+  productShelfLife?: string | null
+  productPackSize?: string | number | null
 }
 
 export interface CreateQuotationPayload {

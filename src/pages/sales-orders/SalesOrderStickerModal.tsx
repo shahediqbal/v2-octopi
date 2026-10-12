@@ -3,6 +3,17 @@ import { PrintDialog } from '@/pages/sales-orders/PrintDialog'
 import { triggerPrintWindow } from '@/pages/sales-orders/printUtils'
 import type { StockOutOrderDetail, StockOutPackagingDetail } from '@/types/stockOut'
 
+function pickStickerText(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    if (typeof value !== 'string') continue
+
+    const trimmed = value.trim()
+    if (trimmed) return trimmed
+  }
+
+  return null
+}
+
 const stickerStyles = `
   .so-stickers * { box-sizing: border-box; }
   .so-stickers {
@@ -17,13 +28,29 @@ const stickerStyles = `
     max-width: 402px;
     height: 218px;
     max-height: 218px;
-    border: 1px solid #000;
+    border: 0;
     padding: 10px;
     display: flex;
     flex-direction: column;
     row-gap: 4px;
     page-break-inside: avoid;
     font-family: Arial, Helvetica, sans-serif;
+  }
+  .so-sticker__logo {
+    display: block;
+    object-fit: contain;
+    object-position: center;
+    flex-shrink: 0;
+  }
+  .so-sticker__logo--trade {
+    height: 20px;
+    width: auto;
+    max-width: 50px;
+  }
+  .so-sticker__logo--assutext {
+    height: 25px;
+    width: auto;
+    max-width: 80px;
   }
   .so-sticker__base {
     display: flex;
@@ -56,6 +83,9 @@ const stickerStyles = `
     display: flex;
     column-gap: 4px;
   }
+  .so-sticker__info-row--lot {
+    margin-bottom: 12px;
+  }
   .so-sticker__info-label {
     font-size: 10px;
     font-weight: bold;
@@ -82,7 +112,35 @@ const stickerStyles = `
     font-size: 6px;
   }
   @media print {
-    @page { margin: 5mm; size: auto; }
+    @page { margin: 0; size: 4in 2in; }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 4in !important;
+      min-width: 4in !important;
+      background: #fff !important;
+    }
+    .so-stickers {
+      display: block !important;
+      width: 4in !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .so-sticker {
+      width: 4in !important;
+      max-width: 4in !important;
+      height: 2in !important;
+      max-height: 2in !important;
+      margin: 0 !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      page-break-after: always;
+      break-after: page;
+    }
+    .so-sticker:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
   }
 `
 
@@ -107,8 +165,13 @@ export function SalesOrderStickerModal({
   const general = orderDetail?.stockOutGeneralData
   const jobType = general?.jobTypeName ?? packagingDetail?.jobType
   const isSampleIssue = jobType === 'Sample_Issue'
-  const partnerName = general?.supplierName ?? general?.customerName ?? packagingDetail?.supplierName ?? packagingDetail?.customerName
-  const invoiceNo = general?.soSystemNo ?? packagingDetail?.soSystemNo
+  const partnerName = pickStickerText(
+    general?.customerName,
+    general?.supplierName,
+    packagingDetail?.customerName,
+    packagingDetail?.supplierName,
+  )
+  const invoiceNo = pickStickerText(general?.soSystemNo, packagingDetail?.soSystemNo)
   const today = new Date().toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
 
   return (
@@ -132,15 +195,13 @@ export function SalesOrderStickerModal({
                   <img
                     src="/images/trade.png"
                     alt="Trade Zentrum"
-                    width="50"
-                    height="20"
+                    className="so-sticker__logo so-sticker__logo--trade"
                     style={{ alignSelf: 'flex-start' }}
                   />
                   <img
                     src="/images/assutext-logo.jpeg"
                     alt="Assutext"
-                    width="80"
-                    height="25"
+                    className="so-sticker__logo so-sticker__logo--assutext"
                     style={{ alignSelf: 'flex-end', marginRight: '10px' }}
                   />
                 </div>
@@ -162,7 +223,7 @@ export function SalesOrderStickerModal({
                     <span className="so-sticker__info-label">&nbsp;{item.sopProductQty} KG</span>
                   </div>
                   {!isSampleIssue && (
-                    <div className="so-sticker__info-row">
+                    <div className="so-sticker__info-row so-sticker__info-row--lot">
                       <span style={{ fontSize: '8px', fontWeight: 'bold' }}>Lot :</span>
                       <span></span>
                     </div>

@@ -12,6 +12,10 @@ import type {
   TopProductRow,
 } from '@/types/reviewCockpit'
 import { isApiEnvelope } from '@/types/reviewCockpit'
+import type {
+  LoanReportDetailItem,
+  LoanReportSummaryItem,
+} from '@/types/loanReport'
 
 function toDateInput(date: Date): string {
   return date.toISOString().slice(0, 10)
@@ -129,17 +133,40 @@ export function useTopProducts(customerId: number | null | undefined, startDate:
   })
 }
 
-export function useCustomerLoanSummary(customerId: number | null | undefined) {
+// export function useCustomerLoanSummary(customerId: number | null | undefined) {
+//   return useQuery({
+//     queryKey: reviewCockpitKeys.loanSummary(customerId ?? 0),
+//     queryFn: async () =>
+//       unwrapDataObj<CustomerLoanSummaryRow[]>(`/Report/GetCustomerLoanSummery/${customerId ?? 0}/0`).then((rows) => rows ?? []),
+//     enabled: !!customerId,
+//     staleTime: 60_000,
+//     refetchOnWindowFocus: false,
+//   })
+// }
+export function useCustomerLoanSummary(
+  customerId: number | null | undefined,
+) {
   return useQuery({
     queryKey: reviewCockpitKeys.loanSummary(customerId ?? 0),
     queryFn: async () =>
-      unwrapDataObj<CustomerLoanSummaryRow[]>(`/Report/GetCustomerLoanSummery/${customerId ?? 0}/0`).then((rows) => rows ?? []),
+      unwrapDataObj<LoanReportSummaryItem[]>(
+        `/Report/GetReportLoanSummery/${customerId ?? 0}/0`,
+      ).then((rows) =>
+        (rows ?? []).map(
+          (row): CustomerLoanSummaryRow => ({
+            productId: row.productId ?? null,
+            productName: row.productName,
+            loanGivenQty: row.loanGivenQuantity,
+            loanReceivedQty: row.loanReceiveQuantity,
+            balanceQty: row.balanceQuantity,
+          }),
+        ),
+      ),
     enabled: !!customerId,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   })
 }
-
 export function useCustomerChequeReport(customerId: number | null | undefined, chequeStatusId = 1) {
   return useQuery({
     queryKey: reviewCockpitKeys.chequeReport(customerId ?? 0, chequeStatusId),
@@ -215,22 +242,51 @@ export function useCreditHistory(
   })
 }
 
+// export function useProductLoanDetails(
+//   customerId: number | null | undefined,
+//   productId: number | null | undefined,
+// ) {
+//   return useQuery({
+//     queryKey: reviewCockpitKeys.loanDetail(customerId ?? 0, productId ?? 0),
+//     queryFn: async () =>
+//       unwrapDataObj<ProductLoanDetailRow[]>(
+//         `/Report/GetCustomerLoanDetails/${customerId ?? 0}/${productId ?? 0}`,
+//       ).then((rows) => rows ?? []),
+//     // enabled: !!customerId && !!productId,
+//     enabled: !!customerId && productId != null,
+//     staleTime: 60_000,
+//     refetchOnWindowFocus: false,
+//   })
+// }
 export function useProductLoanDetails(
   customerId: number | null | undefined,
   productId: number | null | undefined,
 ) {
   return useQuery({
-    queryKey: reviewCockpitKeys.loanDetail(customerId ?? 0, productId ?? 0),
+    queryKey: reviewCockpitKeys.loanDetail(
+      customerId ?? 0,
+      productId ?? 0,
+    ),
     queryFn: async () =>
-      unwrapDataObj<ProductLoanDetailRow[]>(
-        `/Report/GetCustomerLoanDetails/${customerId ?? 0}/${productId ?? 0}`,
-      ).then((rows) => rows ?? []),
-    enabled: !!customerId && !!productId,
+      unwrapDataObj<LoanReportDetailItem[]>(
+        `/Report/GetReportLoanDetails/${customerId ?? 0}/${productId ?? 0}`,
+      ).then((rows) =>
+        (rows ?? []).map(
+          (row): ProductLoanDetailRow => ({
+            productId: row.productId ?? null,
+            manualInvoice: row.invoiceNo,
+            invoiceDate: row.invoiceDate,
+            productName: row.productName,
+            loanGivenQty: row.loanGivenQuantity,
+            loanReceiveQty: row.loanReceiveQuantity,
+          }),
+        ),
+      ),
+    enabled: !!customerId && productId != null,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   })
 }
-
 export function useAllCheques(customerId: number | null | undefined, enabled = true) {
   return useQuery({
     queryKey: reviewCockpitKeys.allCheques(customerId ?? 0),

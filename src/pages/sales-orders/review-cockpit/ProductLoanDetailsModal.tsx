@@ -24,7 +24,8 @@ export function ProductLoanDetailsModal({
 
   const { data: detailRows, isLoading: detailLoading } = useProductLoanDetails(
     customerId,
-    tab === 'details' ? (selectedProductId ?? (summaryData[0]?.productId ?? null)) : null,
+    // tab === 'details' ? (selectedProductId ?? (summaryData[0]?.productId ?? null)) : null,
+    tab === 'details' ? (selectedProductId ?? 0) : null
   )
 
   const filteredDetails = useMemo(() => {
@@ -165,7 +166,7 @@ export function ProductLoanDetailsModal({
               </div>
 
               <div className="mt-3 flex justify-end">
-                <button type="button" onClick={handleExportSummary} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                <button type="button" onClick={handleExportSummary} className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
                   <Download size={14} /> Export Summary
                 </button>
               </div>
@@ -196,7 +197,7 @@ export function ProductLoanDetailsModal({
                     <option key={r.productId} value={r.productId ?? ''}>{r.productName}</option>
                   ))}
                 </select>
-                <button type="button" onClick={handleExportDetails} disabled={filteredDetails.length === 0} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                <button type="button" onClick={handleExportDetails} disabled={filteredDetails.length === 0} className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
                   <Download size={14} /> Excel
                 </button>
               </div>

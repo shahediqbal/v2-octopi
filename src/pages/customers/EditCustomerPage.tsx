@@ -41,6 +41,7 @@ export function EditCustomerPage() {
         currentStatusOptions.find((p) => p.title === customer.currentStatus)?.title ?? '',
       linkCustomerId: customer.linkCustomerId,
       specialNote: customer.specialNote ?? '',
+      disputeAmount: customer.disputeAmount ?? 0,
     }
   }, [customer])
 
@@ -67,6 +68,7 @@ export function EditCustomerPage() {
         currentStatus: data.currentStatus ?? '',
         linkCustomerId: data.linkCustomerId,
         specialNote: data.specialNote ?? '',
+        disputeAmount: data.disputeAmount,
       },
       {
         onSuccess: (res) => {

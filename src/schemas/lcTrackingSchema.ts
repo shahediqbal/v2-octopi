@@ -53,10 +53,10 @@ export const lcCreateSchema = z.object({
     .number({ error: 'LC amount is required' })
     .min(0.01, 'Amount must be > 0'),
   lcDate: z.string().min(1, 'LC date is required'),
-  chequeBankId: z
+  lcIssuerBankId: z
     .number({ error: 'Issuer bank is required' })
     .min(1, 'Issuer bank is required'),
-  locationId: z
+  lcIssuerBranchLocationId: z
     .number({ error: 'Branch location required' })
     .min(1, 'Branch location required'),
 })
@@ -86,10 +86,10 @@ export const lcLimitedUpdateSchema = z.object({
     .number({ error: 'LC amount is required' })
     .min(0.01, 'Amount must be > 0'),
   lcDate: z.string().min(1, 'LC date is required'),
-  chequeBankId: z
+  lcIssuerBankId: z
     .number({ error: 'Issuer bank is required' })
     .min(1, 'Issuer bank is required'),
-  locationId: z
+  lcIssuerBranchLocationId: z
     .number({ error: 'Branch location required' })
     .min(1, 'Branch location required'),
 })

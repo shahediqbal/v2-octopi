@@ -46,7 +46,15 @@ export function calculateConfirmedSubtotal(
   }, 0)
   return parseFloat(sum.toFixed(DECIMAL_PRECISION))
 }
+export function calculateTotalQuantity(
+  items: Array<{ sidDeclaredQty: number | null | undefined }>,
+): number {
+  const sum = items.reduce((acc, item) => {
+    return acc + parseNumeric(item.sidDeclaredQty)
+  }, 0)
 
+  return parseFloat(sum.toFixed(DECIMAL_PRECISION))
+}
 /**
  * Final total = subtotal + adjusted - discount
  * In legacy: sibFinalAmount = sibCalculatedAmount + sibAdjustedAmount - sibDiscountAmouunt

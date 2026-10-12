@@ -207,7 +207,7 @@ export function MappingReportPage() {
               <button
                 onClick={handleLoad}
                 disabled={loadingReport || !!dateError}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loadingReport && <Loader2 size={14} className="animate-spin" />}
                 {loadingReport ? 'Loading…' : 'Load Data'}
@@ -217,7 +217,7 @@ export function MappingReportPage() {
                 <button
                   onClick={handleExport}
                   disabled={filteredData.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <FileSpreadsheet size={14} />
                   Excel
@@ -225,7 +225,7 @@ export function MappingReportPage() {
                 <button
                   onClick={handleLoad}
                   disabled={loadingReport || !!dateError}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
                 >
                   <RefreshCw size={14} className={loadingReport ? 'animate-spin' : ''} />
                   Refresh

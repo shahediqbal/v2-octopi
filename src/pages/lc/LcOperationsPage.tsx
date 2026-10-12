@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, AlertCircle, FileText, Plus } from 'lucide-react'
+import { Loader2, AlertCircle, FileText } from 'lucide-react'
 import { usePiByStatus } from '@/hooks/useLcTracking'
-import { formatDate } from '@/lib/utils'
 
 export function LcOperationsPage() {
   const navigate = useNavigate()
@@ -53,18 +52,20 @@ export function LcOperationsPage() {
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-100 text-sm">
               <thead>
-                <tr className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
-                  <th className="px-5 py-3 text-left">PI Number</th>
-                  <th className="px-5 py-3 text-left">Customer</th>
-                  <th className="px-5 py-3 text-left">PI Date</th>
-                  <th className="px-5 py-3 text-left">Currency</th>
-                  <th className="px-5 py-3 text-right">Action</th>
+                <tr style={{ backgroundColor: '#4a4a4a' }} className="text-xs uppercase text-white">
+                  <th className="px-4 py-3 text-center font-bold">PI System Id</th>
+                  <th className="px-4 py-3 text-center font-bold">PI Number</th>
+                  <th className="px-4 py-3 text-center font-bold">PI Ref</th>
+                  <th className="px-4 py-3 text-center font-bold">PI Date</th>
+                  <th className="px-4 py-3 text-center font-bold">Customer Name</th>
+                  <th className="px-4 py-3 text-center font-bold">Customer Address</th>
+                  <th className="px-4 py-3 text-center font-bold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-gray-100">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-gray-400">
+                    <td colSpan={7} className="px-5 py-10 text-center text-gray-400">
                       <div className="flex flex-col items-center gap-2">
                         <FileText size={32} className="text-gray-300" />
                         <p>No submitted PIs awaiting LC creation.</p>
@@ -74,19 +75,21 @@ export function LcOperationsPage() {
                 ) : (
                   filtered.map((pi) => (
                     <tr key={pi.piSystemId} className="hover:bg-gray-50/50">
-                      <td className="px-5 py-3 font-medium text-gray-900">{pi.piNumber}</td>
-                      <td className="px-5 py-3 text-gray-700">{pi.customerName}</td>
-                      <td className="px-5 py-3 text-gray-500">
-                        {pi.piDate ? formatDate(pi.piDate) : '—'}
+                      <td className="px-4 py-2.5 text-center text-gray-700">{pi.piSystemId}</td>
+                      <td className="px-4 py-2.5 text-center font-medium text-gray-900">{pi.piNumber}</td>
+                      <td className="px-4 py-2.5 text-center text-gray-600">{pi.piRef || '—'}</td>
+                      <td className="px-4 py-2.5 text-center text-gray-600">
+                        {pi.piDate ? new Date(pi.piDate).toLocaleDateString() : '—'}
                       </td>
-                      <td className="px-5 py-3 text-gray-600">{pi.piCurrency}</td>
-                      <td className="px-5 py-3 text-right">
+                      <td className="px-4 py-2.5 text-center text-gray-700">{pi.customerName}</td>
+                      <td className="px-4 py-2.5 text-center text-gray-600">{pi.customerAddress || '—'}</td>
+                      <td className="px-4 py-2.5 text-center">
                         <button
                           type="button"
                           onClick={() => navigate(`/lc/create?piId=${pi.piSystemId}`)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-gray-700"
+                          className="inline-flex items-center gap-1.5 rounded bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-orange-600"
                         >
-                          <Plus size={12} /> Create LC
+                          Create LC
                         </button>
                       </td>
                     </tr>

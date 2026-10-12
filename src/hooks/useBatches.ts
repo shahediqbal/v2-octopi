@@ -9,7 +9,7 @@ export const batchKeys = {
   detail: (id: number) => [...batchKeys.all, 'detail', id] as const,
 }
 
-export function useBatchList(statusFilter: string) {
+export function useBatchList(statusFilter: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: batchKeys.list(statusFilter),
     queryFn: () =>
@@ -17,6 +17,7 @@ export function useBatchList(statusFilter: string) {
         .get<ApiResponse<BatchRow[]>>(`/Batch/GetBatchesGridData/${statusFilter}`)
         .then((r) => r.dataObj ?? []),
     staleTime: 30_000,
+    enabled: options?.enabled ?? true,
   })
 }
 

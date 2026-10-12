@@ -207,19 +207,18 @@ export function useLcPaymentHistory(lcDocId: number | undefined) {
 
 /** GET payment list filtered by paymentMethodId=12 */
 export function useLcPaymentEditList(filters: LcPaymentListFilters, enabled: boolean) {
-  const params = new URLSearchParams({
-    startDate: filters.startDate ?? '',
-    endDate: filters.endDate ?? '',
-    customerId: String(filters.customerId ?? ''),
-    paymentMethodId: '12',
-  })
+  // Build URL matching legacy: customerId defaults to 0, paymentMethodId=12 appended separately
+  const url =
+    `/CustomerPayment/GetPaymentInfoGridByParam` +
+    `?startDate=${filters.startDate ?? ''}` +
+    `&endDate=${filters.endDate ?? ''}` +
+    `&customerId=${filters.customerId ?? 0}` +
+    `&paymentMethodId=12`
   return useQuery({
     queryKey: lcKeys.paymentEditList(filters),
     queryFn: () =>
       apiClient
-        .get<ApiResponse<LcPaymentListItem[]>>(
-          `/CustomerPayment/GetPaymentInfoGridByParam?${params.toString()}`,
-        )
+        .get<ApiResponse<LcPaymentListItem[]>>(url)
         .then((r) => r.dataObj ?? []),
     enabled,
     staleTime: 0,
@@ -298,6 +297,21 @@ export function useEscalatePi() {
   })
 }
 
+/** PUT /LCTracking/UpdatePIConditions/{piId}  — saves the dynamic terms/conditions dict */
+export function useUpdatePiConditions() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ piId, conditions }: { piId: number; conditions: Record<string, string> }) =>
+      apiClient.put<ApiResponse<unknown>>(
+        `/LCTracking/UpdatePIConditions/${piId}`,
+        conditions,
+      ),
+    onSuccess: (_r, vars) => {
+      void qc.invalidateQueries({ queryKey: lcKeys.piDetail(vars.piId) })
+    },
+  })
+}
+
 // ─────────────────── LC Document Mutations ───────────────────
 
 /** POST /LCTracking/CratreLCDocAndPayments  (NOTE: "Cratre" is a backend typo) */
@@ -331,7 +345,7 @@ export function useLcLimitedUpdate() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: LcLimitedUpdatePayload) =>
-      apiClient.put<ApiResponse<unknown>>('/LCTracking/UpdateLCDocAndPayments', data),
+      apiClient.put<ApiResponse<unknown>>('/LCTracking/UpdateLCLimited', data),
     onSuccess: (_r, vars) => {
       void qc.invalidateQueries({ queryKey: lcKeys.lcDetail(vars.lcDocId) })
       void qc.invalidateQueries({ queryKey: lcKeys.all })

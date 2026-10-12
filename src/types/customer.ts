@@ -25,6 +25,7 @@ export interface Customer {
   paymentMode: string | null
   currentStatus: string | null
   specialNote: string | null
+  disputeAmount: number | null
   linkCustomerId: number | null
   linkCustomerName: string | null
 }
@@ -48,6 +49,7 @@ export interface CreateCustomerPayload {
   currentStatus: string
   linkCustomerId: number | null
   specialNote: string
+  disputeAmount: number
 }
 
 /** Payload for PUT /Customer/CustomerUpdate */
@@ -72,6 +74,12 @@ export interface DropdownOption {
 export interface Channel {
   channelId: number
   channelName: string
+}
+
+/** Department from /Department/GetDepartment */
+export interface Department {
+  departmentId: number
+  departmentName: string
 }
 
 /** Designation from /Designation/GetDesignation */

@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react'
-import { AlertCircle, Database, FileSpreadsheet, Loader2, RefreshCw, Search, Truck } from 'lucide-react'
+import { AlertCircle, Database, FileSpreadsheet, FileText, Loader2, RefreshCw, Search, Truck } from 'lucide-react'
 import { PaginatedCombobox } from '@/components/dropdowns'
 import { useDeliveryConveyance } from '@/hooks/useDeliveryConveyance'
+import { DeliveryConveyancePrintModal } from '@/pages/reports/DeliveryConveyancePrintModal'
 import { exportExcelOnDemand } from '@/utils/lazyExportExcel'
 import type { DeliveryConveyanceFilters } from '@/types/deliveryConveyance'
 
@@ -13,20 +14,52 @@ function firstDayOfMonth() {
   const d = new Date()
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), '01'].join('-')
 }
-function fmtDate(value: string | null) {
-  if (!value) return '-'
-  const d = new Date(value)
-  if (isNaN(d.getTime())) return '-'
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-}
 function fmtDateShort(value: string) {
   const d = new Date(value)
   if (isNaN(d.getTime())) return value
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
 }
+function fmtDateTime(value?: string | null) {
+  if (!value) return '-'
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return value
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  })
+}
 function fmtCurrency(value: number | null) {
   if (value == null) return '-'
   return value.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function resolveInvoiceNo(item: { invoiceNo: string | null; soSystemNo?: string | null }) {
+  return item.soSystemNo ?? item.invoiceNo ?? '-'
+}
+
+function resolveDescription(item: { taskDescription: string | null; description?: string | null }) {
+  return item.taskDescription ?? item.description ?? '-'
+}
+
+function resolveStartLocation(item: { startLocation: string | null; taskTransportationStartLocation?: string | null }) {
+  return item.taskTransportationStartLocation ?? item.startLocation ?? '-'
+}
+
+function resolveEndLocation(item: { endLocation: string | null; taskTransportationEndLocation?: string | null }) {
+  return item.taskTransportationEndLocation ?? item.endLocation ?? '-'
+}
+
+function resolveEmployeeId(item: { employeeId: number | null; taskAssignedTo?: number | null }) {
+  return item.employeeId ?? item.taskAssignedTo ?? null
+}
+
+function resolveEmployeeName(item: { employeeName: string | null; billBy?: string | null }) {
+  return item.employeeName?.trim() || item.billBy?.trim() || '-'
 }
 
 const EXCEL_COLUMNS = [
@@ -40,6 +73,7 @@ const EXCEL_COLUMNS = [
   { key: 'endLocation', header: 'End Location' },
   { key: 'employeeId', header: 'Employee ID', format: 'integer' as const },
   { key: 'employeeName', header: 'Employee Name' },
+  { key: 'insertedAt', header: 'Insert Time', width: 22 },
   { key: 'invoiceNo', header: 'Invoice No' },
 ] as const
 
@@ -49,12 +83,17 @@ export function DeliveryConveyanceReportPage() {
   const [employeeId, setEmployeeId] = useState<number | null>(null)
   const [employeeLabel, setEmployeeLabel] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [loadRequested, setLoadRequested] = useState(false)
+  const [appliedFilters, setAppliedFilters] = useState<DeliveryConveyanceFilters | null>(null)
+  const [appliedEmployeeLabel, setAppliedEmployeeLabel] = useState<string | null>(null)
+  const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false)
 
-  const filters: DeliveryConveyanceFilters = useMemo(
+  const draftFilters: DeliveryConveyanceFilters = useMemo(
     () => ({ startDate: fromDate, endDate: toDate, employeeId: employeeId ?? 0 }),
     [fromDate, toDate, employeeId],
   )
+
+  const activeFilters = appliedFilters ?? draftFilters
+  const hasLoaded = appliedFilters !== null
 
   const {
     data: reportData = [],
@@ -62,7 +101,7 @@ export function DeliveryConveyanceReportPage() {
     isError,
     error,
     refetch,
-  } = useDeliveryConveyance(filters, loadRequested)
+  } = useDeliveryConveyance(activeFilters, hasLoaded)
 
   const dateError = useMemo(() => {
     if (!fromDate || !toDate) return 'Both dates are required'
@@ -76,44 +115,67 @@ export function DeliveryConveyanceReportPage() {
     return reportData.filter(
       (item) =>
         item.taskName?.toLowerCase().includes(q) ||
+        item.taskDescription?.toLowerCase().includes(q) ||
+        item.description?.toLowerCase().includes(q) ||
         item.taskDestination?.toLowerCase().includes(q) ||
         item.vehicleName?.toLowerCase().includes(q) ||
-        item.employeeName?.toLowerCase().includes(q) ||
-        item.invoiceNo?.toLowerCase().includes(q),
+        resolveEmployeeName(item).toLowerCase().includes(q) ||
+        item.invoiceNo?.toLowerCase().includes(q) ||
+        item.soSystemNo?.toLowerCase().includes(q),
     )
   }, [reportData, searchTerm])
 
   const uniqueEmployees = useMemo(
-    () => new Set(reportData.filter((i) => i.employeeId).map((i) => i.employeeId)).size,
+    () => new Set(reportData.map(resolveEmployeeId).filter((id) => id != null)).size,
     [reportData],
   )
   const uniqueInvoices = useMemo(
-    () => new Set(reportData.filter((i) => i.invoiceNo).map((i) => i.invoiceNo)).size,
+    () => new Set(reportData.map((item) => resolveInvoiceNo(item)).filter((value) => value !== '-')).size,
     [reportData],
   )
-  const totalTransportCost = useMemo(
-    () => reportData.reduce((s, i) => s + (i.taskTransportationCost ?? 0), 0),
-    [reportData],
+  const visibleTransportCost = useMemo(
+    () => filteredData.reduce((sum, item) => sum + Number(item.taskTransportationCost ?? 0), 0),
+    [filteredData],
   )
 
   const handleLoad = useCallback(() => {
     if (dateError) return
-    setLoadRequested(true)
-    void refetch()
-  }, [dateError, refetch])
+    const nextFilters = { ...draftFilters }
+    const sameFilters =
+      appliedFilters?.startDate === nextFilters.startDate &&
+      appliedFilters?.endDate === nextFilters.endDate &&
+      appliedFilters?.employeeId === nextFilters.employeeId
+
+    setAppliedFilters(nextFilters)
+    setAppliedEmployeeLabel(employeeLabel)
+    setIsPrintPreviewOpen(false)
+
+    if (sameFilters) {
+      void refetch()
+    }
+  }, [appliedFilters, dateError, draftFilters, employeeLabel, refetch])
 
   const handleExport = useCallback(async () => {
     if (filteredData.length === 0) return
     await exportExcelOnDemand({
-      fileName: `Delivery_Conveyance_${fromDate}_to_${toDate}`,
+      fileName: `Delivery_Conveyance_${activeFilters.startDate}_to_${activeFilters.endDate}`,
       title: 'Delivery Conveyance Report',
-      subtitle: `${fmtDateShort(fromDate)} to ${fmtDateShort(toDate)}`,
+      subtitle: `${fmtDateShort(activeFilters.startDate)} to ${fmtDateShort(activeFilters.endDate)}`,
       sheetName: 'Conveyance',
       columns: [...EXCEL_COLUMNS],
-      data: filteredData as unknown as Record<string, unknown>[],
+      data: filteredData.map((item) => ({
+        ...item,
+        taskDescription: resolveDescription(item),
+        startLocation: resolveStartLocation(item),
+        endLocation: resolveEndLocation(item),
+        employeeId: resolveEmployeeId(item),
+        employeeName: resolveEmployeeName(item),
+        insertedAt: fmtDateTime(item.insertedAt),
+        invoiceNo: resolveInvoiceNo(item),
+      })) as unknown as Record<string, unknown>[],
       filters: [
-        ['Date Range', `${fmtDateShort(fromDate)} – ${fmtDateShort(toDate)}`],
-        ['Employee', employeeLabel || 'All'],
+        ['Date Range', `${fmtDateShort(activeFilters.startDate)} – ${fmtDateShort(activeFilters.endDate)}`],
+        ['Employee', appliedEmployeeLabel || 'All'],
       ],
       summaryCards: [
         ['Total Records', reportData.length],
@@ -122,9 +184,15 @@ export function DeliveryConveyanceReportPage() {
         ['Unique Invoices', uniqueInvoices],
       ],
     })
-  }, [filteredData, fromDate, toDate, employeeLabel, reportData.length, uniqueEmployees, uniqueInvoices])
+  }, [activeFilters.endDate, activeFilters.startDate, appliedEmployeeLabel, filteredData, reportData.length, uniqueEmployees, uniqueInvoices])
 
-  const noData = reportData.length === 0
+  const handlePdfExport = useCallback(async () => {
+    if (filteredData.length === 0) return
+    setIsPrintPreviewOpen(true)
+  }, [filteredData.length])
+
+  const noData = hasLoaded && reportData.length === 0
+  const showResults = hasLoaded && reportData.length > 0
 
   return (
     <div className="space-y-6">
@@ -143,7 +211,7 @@ export function DeliveryConveyanceReportPage() {
             <input
               type="date"
               value={fromDate}
-              onChange={(e) => { setFromDate(e.target.value); setLoadRequested(false) }}
+              onChange={(e) => { setFromDate(e.target.value); setIsPrintPreviewOpen(false) }}
               className={inputCls}
             />
           </div>
@@ -152,7 +220,7 @@ export function DeliveryConveyanceReportPage() {
             <input
               type="date"
               value={toDate}
-              onChange={(e) => { setToDate(e.target.value); setLoadRequested(false) }}
+              onChange={(e) => { setToDate(e.target.value); setIsPrintPreviewOpen(false) }}
               className={inputCls}
             />
           </div>
@@ -161,7 +229,8 @@ export function DeliveryConveyanceReportPage() {
             <PaginatedCombobox
               type="employee"
               value={employeeId}
-              onValueChange={(v, label) => { setEmployeeId(v); setEmployeeLabel(label ?? null); setLoadRequested(false) }}
+              onValueChange={(v) => { setEmployeeId(v); setIsPrintPreviewOpen(false) }}
+              onLabelChange={setEmployeeLabel}
               placeholder="All Employees"
             />
           </div>
@@ -179,11 +248,11 @@ export function DeliveryConveyanceReportPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {noData ? (
+            {!hasLoaded ? (
               <button
                 onClick={handleLoad}
                 disabled={isLoading || !!dateError}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading && <Loader2 size={14} className="animate-spin" />}
                 {isLoading ? 'Loading…' : 'Load Data'}
@@ -193,15 +262,23 @@ export function DeliveryConveyanceReportPage() {
                 <button
                   onClick={handleExport}
                   disabled={filteredData.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <FileSpreadsheet size={14} />
                   Excel
                 </button>
                 <button
+                  onClick={handlePdfExport}
+                  disabled={filteredData.length === 0}
+                  className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FileText size={14} />
+                  PDF
+                </button>
+                <button
                   onClick={handleLoad}
                   disabled={isLoading || !!dateError}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                  className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
                 >
                   <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
                   Refresh
@@ -227,7 +304,7 @@ export function DeliveryConveyanceReportPage() {
           </div>
         )}
 
-        {!isLoading && noData && !loadRequested && (
+        {!isLoading && !isError && !hasLoaded && (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
               <Truck size={28} />
@@ -237,7 +314,7 @@ export function DeliveryConveyanceReportPage() {
           </div>
         )}
 
-        {!isLoading && loadRequested && noData && !isError && (
+        {!isLoading && hasLoaded && noData && !isError && (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
               <Database size={28} />
@@ -247,7 +324,7 @@ export function DeliveryConveyanceReportPage() {
           </div>
         )}
 
-        {!noData && (
+        {showResults && (
           <>
             {/* Stats */}
             <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
@@ -266,6 +343,7 @@ export function DeliveryConveyanceReportPage() {
                   <tr>
                     <th className="px-4 py-3 font-semibold">Task ID</th>
                     <th className="px-4 py-3 font-semibold">Task Name</th>
+                    <th className="px-4 py-3 font-semibold">Description</th>
                     <th className="px-4 py-3 font-semibold">Destination</th>
                     <th className="px-4 py-3 font-semibold">Vehicle</th>
                     <th className="px-4 py-3 font-semibold text-right">Transport Cost</th>
@@ -278,7 +356,7 @@ export function DeliveryConveyanceReportPage() {
                 <tbody className="divide-y divide-gray-100">
                   {filteredData.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
+                      <td colSpan={10} className="px-4 py-10 text-center text-gray-400">
                         No records match your search
                       </td>
                     </tr>
@@ -287,21 +365,22 @@ export function DeliveryConveyanceReportPage() {
                       <tr key={idx} className="transition-colors hover:bg-gray-50">
                         <td className="px-4 py-2.5 tabular-nums text-gray-600">{item.taskId ?? '-'}</td>
                         <td className="px-4 py-2.5 font-medium text-gray-900">{item.taskName || '-'}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{resolveDescription(item)}</td>
                         <td className="px-4 py-2.5 text-gray-700">{item.taskDestination || '-'}</td>
                         <td className="px-4 py-2.5 text-gray-700">{item.vehicleName || '-'}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-gray-900">{fmtCurrency(item.taskTransportationCost)}</td>
-                        <td className="px-4 py-2.5 text-gray-600">{item.startLocation || '-'}</td>
-                        <td className="px-4 py-2.5 text-gray-600">{item.endLocation || '-'}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{resolveStartLocation(item)}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{resolveEndLocation(item)}</td>
                         <td className="px-4 py-2.5 text-gray-700">{item.employeeName || '-'}</td>
-                        <td className="px-4 py-2.5 text-gray-600">{item.invoiceNo || '-'}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{resolveInvoiceNo(item)}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
                 <tfoot className="border-t border-gray-200 bg-gray-50 text-xs font-semibold text-gray-600">
                   <tr>
-                    <td colSpan={4} className="px-4 py-2">Total</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{fmtCurrency(totalTransportCost)}</td>
+                    <td colSpan={5} className="px-4 py-2">Total</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{fmtCurrency(visibleTransportCost)}</td>
                     <td colSpan={4} />
                   </tr>
                 </tfoot>
@@ -316,6 +395,15 @@ export function DeliveryConveyanceReportPage() {
           </>
         )}
       </div>
+
+      <DeliveryConveyancePrintModal
+        isOpen={isPrintPreviewOpen}
+        rows={filteredData}
+        startDate={activeFilters.startDate}
+        endDate={activeFilters.endDate}
+        employeeLabel={appliedEmployeeLabel}
+        onClose={() => setIsPrintPreviewOpen(false)}
+      />
     </div>
   )
 }

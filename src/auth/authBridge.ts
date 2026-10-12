@@ -20,7 +20,16 @@ export function getAccessToken(): string | null {
 }
 
 export function isAuthenticated(): boolean {
-  return Boolean(getAccessToken())
+  const token = getAccessToken()
+  if (!token) return false
+  try {
+    const { exp } = jwtDecode<{ exp?: number }>(token)
+    // exp is in seconds, Date.now() is in milliseconds
+    // if no exp claim, treat as valid (some internal tokens omit it)
+    return exp ? exp * 1000 > Date.now() : true
+  } catch {
+    return false
+  }
 }
 
 export function getUserMenusFromMenuToken(): LegacyMenuItem[] {
@@ -75,6 +84,11 @@ export function getAccessibleMenuPaths(): string[] {
   })
 
   return [...paths]
+}
+
+export function getDefaultAuthenticatedRoute(): string {
+  const paths = getAccessibleMenuPaths()
+  return paths.includes('/super-admin/dashboard') ? '/super-admin/dashboard' : '/dashboard'
 }
 
 export function logoutFromBridge() {

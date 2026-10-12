@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { AlertCircle, Database, FileSpreadsheet, Loader2, PackagePlus, RefreshCw, Search } from 'lucide-react'
+import { AlertCircle, Database, FileSpreadsheet, PackagePlus, RefreshCw, Search } from 'lucide-react'
 import { PaginatedCombobox } from '@/components/dropdowns'
 import { DropdownSelect } from '@/components/dropdowns'
 import { useCurrentStock } from '@/hooks/useCurrentStock'
@@ -15,6 +15,7 @@ const EXCEL_COLUMNS = [
   { key: 'productCategoryName', header: 'Category' },
   { key: 'productId', header: 'Product ID', format: 'integer' as const },
   { key: 'productName', header: 'Product Name' },
+  { key: 'channelName', header: 'Channel' },
   { key: 'currentQty', header: 'Current Qty', format: 'number' as const },
 ] as const
 
@@ -23,16 +24,14 @@ export function CurrentStockReportPage() {
   const [productLabel, setProductLabel] = useState<string | null>(null)
   const [channelId, setChannelId] = useState<number | null>(null)
   const [channelLabel, setChannelLabel] = useState<string | null>(null)
+  const [hasRequested, setHasRequested] = useState(false)
+  const [appliedFilters, setAppliedFilters] = useState<CurrentStockFilters>({ productId: 0, channelId: 0 })
+  const [appliedProductLabel, setAppliedProductLabel] = useState<string | null>(null)
+  const [appliedChannelLabel, setAppliedChannelLabel] = useState<string | null>(null)
+  const [requestToken, setRequestToken] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
-  const [loadRequested, setLoadRequested] = useState(false)
 
-  const filterError = useMemo(() => {
-    if (!productId) return 'Please select a product'
-    if (!channelId) return 'Please select a channel'
-    return ''
-  }, [productId, channelId])
-
-  const filters: CurrentStockFilters = useMemo(
+  const draftFilters: CurrentStockFilters = useMemo(
     () => ({ productId: productId ?? 0, channelId: channelId ?? 0 }),
     [productId, channelId],
   )
@@ -42,8 +41,7 @@ export function CurrentStockReportPage() {
     isLoading,
     isError,
     error,
-    refetch,
-  } = useCurrentStock(filters, loadRequested)
+  } = useCurrentStock(appliedFilters, requestToken, hasRequested)
 
   const filteredData = useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
@@ -51,7 +49,8 @@ export function CurrentStockReportPage() {
     return reportData.filter(
       (item) =>
         item.productName?.toLowerCase().includes(q) ||
-        item.productCategoryName?.toLowerCase().includes(q),
+        item.productCategoryName?.toLowerCase().includes(q) ||
+        item.channelName?.toLowerCase().includes(q),
     )
   }, [reportData, searchTerm])
 
@@ -60,60 +59,69 @@ export function CurrentStockReportPage() {
     [reportData],
   )
 
-  const handleLoad = useCallback(() => {
-    if (filterError) return
-    setLoadRequested(true)
-    void refetch()
-  }, [filterError, refetch])
+  const isAllFiltersApplied = appliedFilters.productId === 0 && appliedFilters.channelId === 0
+
+  const handleRefresh = useCallback(() => {
+    setHasRequested(true)
+    setAppliedProductLabel(productLabel ?? null)
+    setAppliedChannelLabel(channelLabel ?? null)
+    setAppliedFilters(draftFilters)
+    setRequestToken((token) => token + 1)
+  }, [draftFilters, productLabel, channelLabel])
 
   const handleExport = useCallback(async () => {
     if (filteredData.length === 0) return
-    await exportExcelOnDemand({
-      fileName: `Current_Stock_${productLabel ?? 'All'}_${channelLabel ?? 'All'}`,
-      title: 'Current Stock Report',
-      subtitle: `Product: ${productLabel ?? 'All'} | Channel: ${channelLabel ?? 'All'}`,
-      sheetName: 'Current Stock',
-      columns: [...EXCEL_COLUMNS],
-      data: filteredData as unknown as Record<string, unknown>[],
-      filters: [
-        ['Product', productLabel || 'All'],
-        ['Channel', channelLabel || 'All'],
-      ],
-      summaryCards: [
-        ['Total Records', reportData.length],
-        ['Filtered', filteredData.length],
-        ['Total Qty', fmtQty(totalQty)],
-      ],
-    })
-  }, [filteredData, productLabel, channelLabel, reportData.length, totalQty])
+    try {
+      await exportExcelOnDemand({
+        fileName: `Current_Stock_${appliedProductLabel ?? 'All'}_${appliedChannelLabel ?? 'All'}`,
+        title: 'Current Stock Report',
+        subtitle: `Product: ${appliedProductLabel ?? 'All'} | Channel: ${appliedChannelLabel ?? 'All'}`,
+        sheetName: 'Current Stock',
+        columns: [...EXCEL_COLUMNS],
+        data: filteredData as unknown as Record<string, unknown>[],
+        filters: [
+          ['Product', appliedProductLabel || 'All'],
+          ['Channel', appliedChannelLabel || 'All'],
+        ],
+        summaryCards: [
+          ['Total Records', reportData.length],
+          ['Filtered', filteredData.length],
+          ['Total Qty', fmtQty(totalQty)],
+        ],
+      })
+    } catch {
+      alert('Failed to export Excel file. Please try again.')
+    }
+  }, [filteredData, appliedProductLabel, appliedChannelLabel, reportData.length, totalQty])
 
-  const noData = reportData.length === 0
+  const noData = hasRequested && reportData.length === 0
+  const showInitialState = !hasRequested && !isLoading && !isError
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Current Stock Report</h1>
-        <p className="mt-1 text-sm text-gray-500">View current stock levels by product and channel.</p>
+        <p className="mt-1 text-sm text-gray-500">Set filters if needed, then click Refresh to load current stock data.</p>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-end gap-3 border-b border-gray-100 px-4 py-4">
           <div className="min-w-[200px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-gray-600">Product <span className="text-red-500">*</span></label>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Product</label>
             <PaginatedCombobox
               type="product"
               value={productId}
-              onValueChange={(v, l) => { setProductId(v); setProductLabel(l ?? null); setLoadRequested(false) }}
-              placeholder="Select Product"
+              onValueChange={(v, l) => { setProductId(v); setProductLabel(l ?? null) }}
+              placeholder="All Products"
             />
           </div>
           <div className="min-w-[200px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-gray-600">Channel <span className="text-red-500">*</span></label>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Channel</label>
             <DropdownSelect
               type="channel"
               value={channelId}
-              onValueChange={(v, l) => { setChannelId(v); setChannelLabel(l ?? null); setLoadRequested(false) }}
-              placeholder="Select Channel"
+              onValueChange={(v, l) => { setChannelId(v); setChannelLabel(l ?? null) }}
+              placeholder="All Channels"
             />
           </div>
           <div className="min-w-[160px]">
@@ -130,41 +138,23 @@ export function CurrentStockReportPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {noData ? (
-              <button
-                onClick={handleLoad}
-                disabled={isLoading || !!filterError}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isLoading && <Loader2 size={14} className="animate-spin" />}
-                {isLoading ? 'Loading…' : 'Load Data'}
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleExport}
-                  disabled={filteredData.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <FileSpreadsheet size={14} />Excel
-                </button>
-                <button
-                  onClick={handleLoad}
-                  disabled={isLoading || !!filterError}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />Refresh
-                </button>
-              </>
-            )}
+            <button
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="action-report inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />Refresh
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={filteredData.length === 0}
+              className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <FileSpreadsheet size={14} />Excel
+            </button>
           </div>
         </div>
 
-        {filterError && loadRequested && (
-          <div className="mx-4 my-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-            <AlertCircle size={14} /> {filterError}
-          </div>
-        )}
         {isLoading && (
           <div className="h-1 w-full overflow-hidden bg-gray-100">
             <div className="h-full w-1/3 animate-[slide_1s_ease-in-out_infinite] rounded bg-gray-400" />
@@ -176,26 +166,33 @@ export function CurrentStockReportPage() {
           </div>
         )}
 
-        {!isLoading && noData && !loadRequested && (
-          <div className="flex flex-col items-center justify-center py-14 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
-              <PackagePlus size={28} />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900">No Data Loaded</h2>
-            <p className="mt-1 max-w-sm text-sm text-gray-500">Select a product and channel, then click Load Data.</p>
-          </div>
-        )}
-        {!isLoading && loadRequested && noData && !isError && (
+        {showInitialState && (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
               <Database size={28} />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">No Records Found</h2>
-            <p className="mt-1 max-w-sm text-sm text-gray-500">No stock records match the selected filters.</p>
+            <h2 className="text-lg font-semibold text-gray-900">Load Stock Records</h2>
+            <p className="mt-1 max-w-sm text-sm text-gray-500">
+              Use filters if needed, then click Refresh to load stock records.
+            </p>
           </div>
         )}
 
-        {!noData && (
+        {!isLoading && noData && !isError && (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
+              {isAllFiltersApplied ? <PackagePlus size={28} /> : <Database size={28} />}
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900">No Records Found</h2>
+            <p className="mt-1 max-w-sm text-sm text-gray-500">
+              {isAllFiltersApplied
+                ? 'No stock records are available right now.'
+                : 'No stock records match the selected filters.'}
+            </p>
+          </div>
+        )}
+
+        {!showInitialState && !noData && (
           <>
             <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -212,13 +209,14 @@ export function CurrentStockReportPage() {
                     <th className="px-4 py-3 font-semibold">Category</th>
                     <th className="px-4 py-3 font-semibold">Product ID</th>
                     <th className="px-4 py-3 font-semibold">Product</th>
+                    <th className="px-4 py-3 font-semibold">Channel</th>
                     <th className="px-4 py-3 font-semibold text-right">Current Qty</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredData.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-gray-400">No records match your search</td>
+                      <td colSpan={5} className="px-4 py-10 text-center text-gray-400">No records match your search</td>
                     </tr>
                   ) : (
                     filteredData.map((item, idx) => (
@@ -226,6 +224,7 @@ export function CurrentStockReportPage() {
                         <td className="px-4 py-2.5 text-gray-600">{item.productCategoryName || '-'}</td>
                         <td className="px-4 py-2.5 text-gray-600">{item.productId ?? '-'}</td>
                         <td className="px-4 py-2.5 font-medium text-gray-900">{item.productName || '-'}</td>
+                        <td className="px-4 py-2.5 text-gray-600">{item.channelName || '-'}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums font-medium text-emerald-700">{fmtQty(item.currentQty)}</td>
                       </tr>
                     ))

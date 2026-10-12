@@ -57,14 +57,14 @@ export function PurchasePriceListPage() {
             type="button"
             onClick={handleExport}
             disabled={isExporting || isLoading}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+            className="action-report inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
           >
             {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
             Export
           </button>
           <Link
             to="/purchase-prices/add"
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
+            className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
           >
             <Plus size={15} /> Add Price
           </Link>
@@ -152,13 +152,13 @@ export function PurchasePriceListPage() {
                             onClick={() =>
                               setHistoryTarget({ id: price.productId, name: price.productName })
                             }
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-view inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <History size={12} /> History
                           </button>
                           <Link
                             to={`/purchase-prices/${price.productId}/edit`}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-update inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <Pencil size={12} /> Edit
                           </Link>

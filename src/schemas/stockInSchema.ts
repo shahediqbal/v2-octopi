@@ -149,6 +149,7 @@ export type StockAdjustmentFormData = z.infer<typeof stockAdjustmentSchema>
 export const stockInInvoiceFilterSchema = z.object({
   supplierId: z.number().default(0),
   customerId: z.number().default(0),
+  jobTypeId: z.number().default(0),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 })

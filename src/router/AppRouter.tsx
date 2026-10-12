@@ -1,9 +1,10 @@
-import { Suspense, lazy } from 'react'
+import { lazy } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ProtectedRoute } from '@/auth/ProtectedRoute'
 import { AppShell } from '@/layout/AppShell'
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const SuperAdminDashboardPage = lazy(() => import('@/pages/SuperAdminDashboardPage').then((m) => ({ default: m.SuperAdminDashboardPage })))
 const SigninPage = lazy(() => import('@/pages/SigninPage').then((m) => ({ default: m.SigninPage })))
 const DeliveryReportPage = lazy(() => import('@/pages/reports/DeliveryReportPage').then((m) => ({ default: m.DeliveryReportPage })))
 const MappingReportPage = lazy(() => import('@/pages/reports/MappingReportPage').then((m) => ({ default: m.MappingReportPage })))
@@ -15,7 +16,10 @@ const AddCustomerPage = lazy(() => import('@/pages/customers/AddCustomerPage').t
 const EditCustomerPage = lazy(() => import('@/pages/customers/EditCustomerPage').then((m) => ({ default: m.EditCustomerPage })))
 const AssignCustomersToEmployeePage = lazy(() => import('@/pages/customers/AssignCustomersToEmployeePage').then((m) => ({ default: m.AssignCustomersToEmployeePage })))
 const CustomerFlagUpdatePage = lazy(() => import('@/pages/customers/CustomerFlagUpdatePage').then((m) => ({ default: m.CustomerFlagUpdatePage })))
+const CustomerTransactionsPage = lazy(() => import('@/pages/customers/CustomerTransactionsPage').then((m) => ({ default: m.CustomerTransactionsPage })))
 const EmployeeListPage = lazy(() => import('@/pages/employees/EmployeeListPage').then((m) => ({ default: m.EmployeeListPage })))
+const AddEmployeePage = lazy(() => import('@/pages/employees/AddEmployeePage').then((m) => ({ default: m.AddEmployeePage })))
+const EditEmployeePage = lazy(() => import('@/pages/employees/EditEmployeePage').then((m) => ({ default: m.EditEmployeePage })))
 const AddChequePage = lazy(() => import('@/pages/cheques/AddChequePage').then((m) => ({ default: m.AddChequePage })))
 const ChequeListPage = lazy(() => import('@/pages/cheques/ChequeListPage').then((m) => ({ default: m.ChequeListPage })))
 const EditChequePage = lazy(() => import('@/pages/cheques/EditChequePage').then((m) => ({ default: m.EditChequePage })))
@@ -47,6 +51,7 @@ const EditProductFunctionPage = lazy(() => import('@/pages/products/EditProductF
 const ManageRoleAndMenuPage = lazy(() => import('@/pages/admin/ManageRoleAndMenuPage').then((m) => ({ default: m.ManageRoleAndMenuPage })))
 const SignupPage = lazy(() => import('@/pages/users/SignupPage').then((m) => ({ default: m.SignupPage })))
 const UserRolesPage = lazy(() => import('@/pages/users/UserRolesPage').then((m) => ({ default: m.UserRolesPage })))
+const ChangePasswordPage = lazy(() => import('@/pages/users/ChangePasswordPage').then((m) => ({ default: m.ChangePasswordPage })))
 const ProductOutReportPage = lazy(() => import('@/pages/reports/ProductOutReportPage').then((m) => ({ default: m.ProductOutReportPage })))
 const TaskAssignListPage = lazy(() => import('@/pages/sales-orders/TaskAssignListPage').then((m) => ({ default: m.TaskAssignListPage })))
 const AssignTaskPage = lazy(() => import('@/pages/sales-orders/AssignTaskPage').then((m) => ({ default: m.AssignTaskPage })))
@@ -91,9 +96,11 @@ const UpdateLcDocPage = lazy(() => import('@/pages/lc/UpdateLcDocPage').then((m)
 const LcEditListPage = lazy(() => import('@/pages/lc/LcEditListPage').then((m) => ({ default: m.LcEditListPage })))
 const LcLimitedUpdatePage = lazy(() => import('@/pages/lc/LcLimitedUpdatePage').then((m) => ({ default: m.LcLimitedUpdatePage })))
 const LcPaymentOperationsPage = lazy(() => import('@/pages/lc/LcPaymentOperationsPage').then((m) => ({ default: m.LcPaymentOperationsPage })))
+const LcPaymentCompletedPage = lazy(() => import('@/pages/lc/LcPaymentCompletedPage').then((m) => ({ default: m.LcPaymentCompletedPage })))
 const LcPaymentEntryPage = lazy(() => import('@/pages/lc/LcPaymentEntryPage').then((m) => ({ default: m.LcPaymentEntryPage })))
 const LcPaymentEditListPage = lazy(() => import('@/pages/lc/LcPaymentEditListPage').then((m) => ({ default: m.LcPaymentEditListPage })))
 const LcPaymentEditPage = lazy(() => import('@/pages/lc/LcPaymentEditPage').then((m) => ({ default: m.LcPaymentEditPage })))
+const LcPaymentViewPage = lazy(() => import('@/pages/lc/LcPaymentViewPage').then((m) => ({ default: m.LcPaymentViewPage })))
 const LcStatusReportPage = lazy(() => import('@/pages/lc/LcStatusReportPage').then((m) => ({ default: m.LcStatusReportPage })))
 // ── Sticker Packing ──
 const StickerOrderListPage = lazy(() => import('@/pages/sticker-packing/StickerOrderListPage').then((m) => ({ default: m.StickerOrderListPage })))
@@ -137,17 +144,6 @@ const SalesPaymentDashboardPage = lazy(() => import('@/pages/reports/SalesPaymen
 const CustomerLookupPage = lazy(() => import('@/pages/customers/CustomerLookupPage').then((m) => ({ default: m.CustomerLookupPage })))
 const PackingPrintPanelPage = lazy(() => import('@/pages/packing/PackingPrintPanelPage').then((m) => ({ default: m.PackingPrintPanelPage })))
 
-function RouteFallback() {
-  return (
-    <div className="flex min-h-[320px] items-center justify-center py-16">
-      <div className="flex items-center gap-3 text-sm text-gray-500">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
-        Loading page…
-      </div>
-    </div>
-  )
-}
-
 const standardStockOutPaths = ['/sales-orders', '/salesorderinternal']
 const escalationStockOutPaths = ['/sales-orders/escalations', '/salesorderinternal/escalationlist', ...standardStockOutPaths]
 const packagingStockOutPaths = ['/sales-orders/packages', '/salesorderinternal/packagelist']
@@ -169,7 +165,12 @@ const sellingPricePaths = ['/selling-prices', '/price', '/addsellprice']
 const purchasePricePaths = ['/purchase-prices', '/purchaseprices']
 const lcOperationsPaths = ['/lc/operations', '/lctracking/listlcanddoc']
 const lcDocPaths = ['/lc/documents', '/lctracking/documentactionlist']
-
+const superAdminDashboardPaths = ['/super-admin/dashboard']
+const AiChatPage = lazy(() =>
+  import('@/pages/ai/AiChatPage').then((module) => ({
+    default: module.AiChatPage,
+  })),
+)
 function protect(element: React.ReactNode, allowedPaths: string[]) {
   return <ProtectedRoute allowedPaths={allowedPaths}>{element}</ProtectedRoute>
 }
@@ -178,7 +179,6 @@ export function AppRouter() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
-        <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/signin" element={<SigninPage />} />
 
@@ -192,6 +192,7 @@ export function AppRouter() {
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="super-admin/dashboard" element={protect(<SuperAdminDashboardPage />, superAdminDashboardPaths)} />
               <Route path="reports/sales" element={<SalesReportPage />} />
               <Route path="reports/delivery" element={<DeliveryReportPage />} />
               <Route path="reports/mapping" element={<MappingReportPage />} />
@@ -202,7 +203,11 @@ export function AppRouter() {
               <Route path="customers/:id/edit" element={<EditCustomerPage />} />
               <Route path="customers/assign-employees" element={<AssignCustomersToEmployeePage />} />
               <Route path="customers/flag-update" element={<CustomerFlagUpdatePage />} />
+              <Route path="customers/transactions" element={protect(<CustomerTransactionsPage />, standardStockOutPaths)} />
+              <Route path="customers/:id/transactions" element={protect(<CustomerTransactionsPage />, standardStockOutPaths)} />
               <Route path="employees" element={<EmployeeListPage />} />
+              <Route path="employees/add" element={<AddEmployeePage />} />
+              <Route path="employees/:id/edit" element={<EditEmployeePage />} />
               <Route path="cheques" element={<ChequeListPage />} />
               <Route path="cheques/add" element={<AddChequePage />} />
               <Route path="cheques/:id/edit" element={<EditChequePage />} />
@@ -272,6 +277,7 @@ export function AppRouter() {
               <Route path="admin/roles" element={<ManageRoleAndMenuPage />} />
               <Route path="users/signup" element={<SignupPage />} />
               <Route path="users/roles" element={<UserRolesPage />} />
+              <Route path="users/change-password" element={<ChangePasswordPage />} />
               <Route path="reports/product-out" element={<ProductOutReportPage />} />
 
               {/* ── Selling Prices ── */}
@@ -309,9 +315,11 @@ export function AppRouter() {
 
               {/* ── LC Tracking — Payments ── */}
               <Route path="lc/payments" element={<LcPaymentOperationsPage />} />
+              <Route path="lc/payments/completed" element={<LcPaymentCompletedPage />} />
               <Route path="lc/payment/new" element={<LcPaymentEntryPage />} />
               <Route path="lc/payment/edit-list" element={<LcPaymentEditListPage />} />
               <Route path="lc/payment/:id/edit" element={<LcPaymentEditPage />} />
+              <Route path="lc/payment/:id/view" element={<LcPaymentViewPage />} />
 
               {/* ── LC Status Report ── */}
               <Route path="lc/status" element={<LcStatusReportPage />} />
@@ -439,9 +447,13 @@ export function AppRouter() {
               <Route path="location/add" element={<Navigate to="/locations/add" replace />} />
               <Route path="location/:id/edit" element={<EditLocationPage />} />
               <Route path="inhouseemployees" element={<Navigate to="/employees" replace />} />
+              <Route path="addemployee" element={<Navigate to="/employees/add" replace />} />
+              <Route path="employee/:id/edit" element={<EditEmployeePage />} />
               <Route path="manageroleandmenu" element={<Navigate to="/admin/roles" replace />} />
               <Route path="signup" element={<Navigate to="/users/signup" replace />} />
               <Route path="roles/users" element={<Navigate to="/users/roles" replace />} />
+              <Route path="user/changepassword" element={<Navigate to="/users/change-password" replace />} />
+              <Route path="changepassword" element={<Navigate to="/users/change-password" replace />} />
 
               {/* ── Selling / Purchase Price legacy ── */}
               <Route path="price" element={<Navigate to="/selling-prices" replace />} />
@@ -468,6 +480,7 @@ export function AppRouter() {
               <Route path="lctracking/:id/updatelcdoc" element={protect(<UpdateLcDocPage />, lcDocPaths)} />
               <Route path="lctracking/documentactionlist" element={<Navigate to="/lc/documents" replace />} />
               <Route path="lctracking/lcpaymentlist" element={<Navigate to="/lc/payments" replace />} />
+              <Route path="lctracking/lcpaymentcompletedlist" element={<Navigate to="/lc/payments/completed" replace />} />
               <Route path="lctracking/:id/lcpayment" element={<LcPaymentEntryPage />} />
               <Route path="lctracking/lctrackingreport" element={<Navigate to="/lc/status" replace />} />
               <Route path="lc-payments/list" element={<Navigate to="/lc/payment/edit-list" replace />} />
@@ -515,11 +528,17 @@ export function AppRouter() {
               <Route path="report/getstockbyproduct" element={<Navigate to="/reports/stock-by-product" replace />} />
               <Route path="report/productinsummaryreport" element={<Navigate to="/reports/stockin-summary" replace />} />
               <Route path="report/productin-with-adjustment" element={<Navigate to="/reports/product-in-adjustment" replace />} />
+            <Route
+  path="ai-chat"
+  element={protect(
+    <AiChatPage />,
+    ['/ai-chat'],
+  )}
+/>
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
-        </Suspense>
       </ErrorBoundary>
     </BrowserRouter>
   )

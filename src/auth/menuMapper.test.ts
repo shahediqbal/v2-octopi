@@ -15,7 +15,8 @@ describe('menuMapper', () => {
     expect(mapLegacyPathToV2Path('/stockout/status')).toBe('/sales-orders/status')
     expect(mapLegacyPathToV2Path('/stockout/update')).toBe('/sales-orders/pending')
     expect(mapLegacyPathToV2Path('/salesoperation/stockoutstockrevert')).toBe('/sales-orders/delivery-return')
-    expect(mapLegacyPathToV2Path('/packingessential/packingrelatedprint')).toBe('/sales-orders/packing-print')
+    expect(mapLegacyPathToV2Path('/packingessential/packingrelatedprint')).toBe('/packing/print-panel')
+    expect(mapLegacyPathToV2Path('/lctracking/lcpaymentcompletedlist')).toBe('/lc/payments/completed')
   })
 
   it('normalizes missing leading slashes and leaves unknown routes unchanged', () => {

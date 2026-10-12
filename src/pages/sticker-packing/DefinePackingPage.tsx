@@ -1,11 +1,243 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { Loader2, AlertCircle, Save, ArrowLeft, PackagePlus } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlertCircle, ArrowLeft, Loader2, Save, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { SearchableSelect } from '@/components/dropdowns'
 import { useSalesOrderInternalDetail, usePackTypes, useCreateStickerPacking } from '@/hooks/useStickerPacking'
-import { useDropdown } from '@/hooks/useDropdown'
-import { PackingItemRow } from '@/components/sticker-packing/PackingItemRow'
+import { useEmployeeOptions } from '@/hooks/useEmployees'
+import { extractApiErrorMessage, extractApiResponseErrorMessage } from '@/pages/sales-orders/stockOutMappers'
 import { useToastStore } from '@/stores/toastStore'
 import type { PackingItem } from '@/types/stickerPacking'
+
+interface StickerPackingRowValue extends PackingItem {
+  delete?: 1
+}
+
+const inputCls =
+  'block w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 sm:text-sm'
+
+function parsePackingNumber(value: number | string | null | undefined) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function formatPackingNumber(value: number) {
+  return value.toFixed(4)
+}
+
+function calculatePackQuantity(packSize: number | string, packNo: number | string) {
+  return formatPackingNumber(parsePackingNumber(packSize) * parsePackingNumber(packNo))
+}
+
+function isAutoFilled(row: StickerPackingRowValue) {
+  return Math.abs(parsePackingNumber(row.packSize) - row.quantity) <= 0.0001 && parsePackingNumber(row.packNo) === 1
+}
+
+function hasPackingValues(row: StickerPackingRowValue) {
+  return Boolean(row.packSize || row.packNo || row.packQuantity || row.sopPackId || row.packedBy)
+}
+
+function createSplitRow(
+  row: StickerPackingRowValue,
+  options: { preserveSelections?: boolean } = {},
+): StickerPackingRowValue {
+  return {
+    index: `${row.productId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    productId: row.productId,
+    productName: row.productName,
+    quantity: row.quantity,
+    packSize: '',
+    packNo: '',
+    packQuantity: '',
+    sopPackId: options.preserveSelections ? row.sopPackId : null,
+    packedBy: options.preserveSelections ? row.packedBy : null,
+    delete: 1,
+  }
+}
+
+function rebalanceStickerRows(rows: StickerPackingRowValue[], changedIndex: string) {
+  const changedRow = rows.find((row) => row.index === changedIndex)
+  if (!changedRow) return rows
+
+  if (parsePackingNumber(changedRow.packQuantity) > changedRow.quantity + 0.0001) {
+    return rows.map((row) =>
+      row.index === changedIndex
+        ? { ...row, packSize: '', packNo: '', packQuantity: '' }
+        : row,
+    )
+  }
+
+  const productRows = rows.filter((row) => row.productId === changedRow.productId)
+  const totalPacked = productRows.reduce((sum, row) => sum + parsePackingNumber(row.packQuantity), 0)
+  const remaining = changedRow.quantity - totalPacked
+  const hasEmptySplit = productRows.some((row) => row.delete === 1 && !row.packSize && !row.packNo)
+
+  if (remaining > 0.0001 && !hasEmptySplit) {
+    const insertIndex = rows.findIndex((row) => row.index === changedIndex)
+    const nextRows = [...rows]
+    nextRows.splice(insertIndex + 1, 0, createSplitRow(changedRow, { preserveSelections: true }))
+    return nextRows
+  }
+
+  if (remaining <= 0.0001) {
+    return rows.filter(
+      (row) => !(row.productId === changedRow.productId && row.delete === 1 && !row.packSize && !row.packNo),
+    )
+  }
+
+  return rows
+}
+
+function updateStickerRow(
+  rows: StickerPackingRowValue[],
+  index: string,
+  field: 'packSize' | 'packNo' | 'sopPackId' | 'packedBy',
+  value: string | number | null,
+) {
+  const nextRows = rows.map((row) => {
+    if (row.index !== index) return row
+
+    const updated = { ...row, [field]: value }
+    if (field === 'packSize' || field === 'packNo') {
+      updated.packQuantity = calculatePackQuantity(
+        field === 'packSize' ? value : row.packSize,
+        field === 'packNo' ? value : row.packNo,
+      )
+    }
+
+    return updated
+  })
+
+  return rebalanceStickerRows(nextRows, index)
+}
+
+function applyAutoFill(rows: StickerPackingRowValue[], index: string, enabled: boolean) {
+  const nextRows = rows.map((row) => {
+    if (row.index !== index) return row
+    if (row.delete === 1 || row.quantity <= 0) return row
+    if (!enabled) {
+      return { ...row, packSize: '', packNo: '', packQuantity: '' }
+    }
+
+    return {
+      ...row,
+      packSize: String(row.quantity),
+      packNo: '1',
+      packQuantity: formatPackingNumber(row.quantity),
+    }
+  })
+
+  return rebalanceStickerRows(nextRows, index)
+}
+
+function removeStickerRow(rows: StickerPackingRowValue[], index: string) {
+  const target = rows.find((row) => row.index === index)
+  if (!target) return rows
+
+  const filtered = rows.filter((row) => row.index !== index)
+  if (target.delete === 1 && !hasPackingValues(target)) {
+    return filtered
+  }
+
+  const productRows = filtered.filter((row) => row.productId === target.productId)
+  if (productRows.length === 0) {
+    return filtered
+  }
+
+  const totalPacked = productRows.reduce((sum, row) => sum + parsePackingNumber(row.packQuantity), 0)
+  const hasEmptySplit = productRows.some((row) => row.delete === 1 && !hasPackingValues(row))
+  if (totalPacked < target.quantity - 0.0001 && !hasEmptySplit) {
+    return [...filtered, createSplitRow(target, { preserveSelections: true })]
+  }
+
+  return filtered
+}
+
+function validateStickerRows(rows: StickerPackingRowValue[]) {
+  if (rows.length === 0) {
+    return { isValid: false, message: 'Please add products to define packing.' }
+  }
+
+  const incompleteRows = rows.filter(
+    (row) => !row.packSize || !row.packNo || !row.packQuantity || !row.sopPackId,
+  )
+  if (incompleteRows.length > 0) {
+    const productLabels = [...new Set(incompleteRows.map((row) => row.productName))]
+    return {
+      isValid: false,
+      message: `Please complete packing fields for: ${productLabels.join(', ')}`,
+    }
+  }
+
+  const invalidRows = rows.filter(
+    (row) =>
+      parsePackingNumber(row.packSize) <= 0 ||
+      parsePackingNumber(row.packNo) <= 0 ||
+      parsePackingNumber(row.packQuantity) <= 0,
+  )
+  if (invalidRows.length > 0) {
+    return {
+      isValid: false,
+      message: 'Pack size, pack count, and pack quantity must be positive numbers.',
+    }
+  }
+
+  const grouped = new Map<number, { name: string; quantity: number; packed: number }>()
+  for (const row of rows) {
+    const current = grouped.get(row.productId) ?? {
+      name: row.productName,
+      quantity: row.quantity,
+      packed: 0,
+    }
+    current.packed += parsePackingNumber(row.packQuantity)
+    grouped.set(row.productId, current)
+  }
+
+  const mismatches = [...grouped.values()].filter(
+    (group) => Math.abs(group.quantity - group.packed) > 0.0001,
+  )
+  if (mismatches.length > 0) {
+    return {
+      isValid: false,
+      message: mismatches
+        .map(
+          (group) =>
+            `${group.name}: order=${group.quantity.toFixed(4)}, packed=${group.packed.toFixed(4)}`,
+        )
+        .join(' | '),
+    }
+  }
+
+  return { isValid: true, message: '' }
+}
+
+function summarizeStickerRows(rows: StickerPackingRowValue[]) {
+  const grouped = new Map<number, { quantity: number; packed: number }>()
+
+  for (const row of rows) {
+    const current = grouped.get(row.productId) ?? {
+      quantity: row.quantity,
+      packed: 0,
+    }
+    current.packed += parsePackingNumber(row.packQuantity)
+    grouped.set(row.productId, current)
+  }
+
+  return {
+    productCount: grouped.size,
+    rowCount: rows.length,
+    totalOrderQty: [...grouped.values()].reduce((sum, group) => sum + group.quantity, 0),
+    totalPackedQty: [...grouped.values()].reduce((sum, group) => sum + group.packed, 0),
+  }
+}
+
+function SummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</p>
+      <p className="mt-1 text-sm font-medium text-gray-900">{value}</p>
+    </div>
+  )
+}
 
 export function DefinePackingPage() {
   const { id } = useParams<{ id: string }>()
@@ -15,204 +247,353 @@ export function DefinePackingPage() {
 
   const { data: orderDetail, isLoading: loadingOrder, isError: orderError } = useSalesOrderInternalDetail(soSystemId)
   const { data: packTypes = [], isLoading: loadingPackTypes } = usePackTypes()
-  const { data: employeeOptions = [] } = useDropdown('employeebychannel')
+  const { data: employees = [] } = useEmployeeOptions()
   const createMutation = useCreateStickerPacking()
 
-  const employees = employeeOptions.map((e) => ({ id: e.key, label: e.value }))
+  const [editedRowsState, setEditedRowsState] = useState<{
+    sourceOrderId: number | null
+    rows: StickerPackingRowValue[] | null
+  }>({ sourceOrderId: null, rows: null })
+  const [serverError, setServerError] = useState('')
 
-  const [items, setItems] = useState<PackingItem[]>([])
+  const initialRows = useMemo(
+    () =>
+      !orderDetail
+        ? []
+        : orderDetail.stockOutItemsData.map((item, idx) => ({
+            index: `${item.sodProductId}-${idx}`,
+            productId: item.sodProductId,
+            productName: item.productName ?? `Product ${item.sodProductId}`,
+            packSize: '',
+            packNo: '',
+            packQuantity: '',
+            quantity: parsePackingNumber(item.sodConfirmedQty ?? item.sodQty),
+            sopPackId: null,
+            packedBy: null,
+          })),
+    [orderDetail],
+  )
 
-  useEffect(() => {
-    if (!orderDetail) return
-    setItems(
-      orderDetail.stockOutItemsData.map((item, idx) => ({
-        index: `${item.sodProductId}-${idx}`,
-        productId: item.sodProductId,
-        productName: item.productName ?? `Product ${item.sodProductId}`,
-        packSize: '',
-        packNo: '',
-        packQuantity: 0,
-        quantity: item.sodConfirmedQty ?? 0,
-        sopPackId: null,
-        packedBy: null,
+  const rows =
+    editedRowsState.sourceOrderId === soSystemId && editedRowsState.rows
+      ? editedRowsState.rows
+      : initialRows
+
+  function updateRows(
+    updater: (current: StickerPackingRowValue[]) => StickerPackingRowValue[],
+  ) {
+    setEditedRowsState((currentState) => {
+      const currentRows =
+        currentState.sourceOrderId === soSystemId && currentState.rows
+          ? currentState.rows
+          : initialRows
+
+      return {
+        sourceOrderId: soSystemId,
+        rows: updater(currentRows),
+      }
+    })
+  }
+
+  const packTypeOptions = useMemo(
+    () =>
+      packTypes.map((packType) => ({
+        key: packType.packId,
+        value: packType.packTypeName,
       })),
-    )
-  }, [orderDetail])
+    [packTypes],
+  )
 
-  function handleChange(index: string, updates: Partial<PackingItem>) {
-    setItems((prev) => prev.map((it) => (it.index === index ? { ...it, ...updates } : it)))
+  const employeeSelectOptions = useMemo(
+    () =>
+      employees.map((employee) => ({
+        key: employee.id,
+        value: employee.label,
+      })),
+    [employees],
+  )
+
+  const validation = useMemo(() => validateStickerRows(rows), [rows])
+  const summary = useMemo(() => summarizeStickerRows(rows), [rows])
+  const globalPackTypeId = useMemo(() => {
+    if (rows.length === 0) {
+      return null
+    }
+
+    const firstPackTypeId = rows[0]?.sopPackId ?? null
+    if (firstPackTypeId == null) {
+      return null
+    }
+
+    return rows.every((row) => row.sopPackId === firstPackTypeId) ? firstPackTypeId : null
+  }, [rows])
+
+  function handleGlobalPackTypeChange(packTypeId: number | null) {
+    setServerError('')
+    updateRows((current) => current.map((row) => ({
+      ...row,
+      sopPackId: packTypeId,
+    })))
   }
 
-  function handleDelete(index: string) {
-    setItems((prev) => prev.filter((it) => it.index !== index))
+  function handleFieldChange(
+    index: string,
+    field: 'packSize' | 'packNo' | 'sopPackId' | 'packedBy',
+    value: string | number | null,
+  ) {
+    setServerError('')
+    updateRows((current) => updateStickerRow(current, index, field, value))
   }
 
-  function handleAddRow() {
-    const newIndex = `extra-${Date.now()}`
-    setItems((prev) => [
-      ...prev,
-      {
-        index: newIndex,
-        productId: 0,
-        productName: '— Extra Row —',
-        packSize: '',
-        packNo: '',
-        packQuantity: 0,
-        quantity: 0,
-        sopPackId: null,
-        packedBy: null,
-      },
-    ])
+  function handleAutoFill(index: string, enabled: boolean) {
+    setServerError('')
+    updateRows((current) => applyAutoFill(current, index, enabled))
   }
 
-  function handleSubmit() {
-    const hasInvalid = items.some(
-      (it) => !Number(it.packSize) || !Number(it.packNo),
-    )
-    if (hasInvalid) {
-      showToast({ message: 'Please fill pack size and pack count for all rows.', type: 'error' })
+  function handleRemove(index: string) {
+    setServerError('')
+    updateRows((current) => removeStickerRow(current, index))
+  }
+
+  async function handleSubmit() {
+    setServerError('')
+    if (!validation.isValid) {
+      setServerError(validation.message)
       return
     }
 
-    createMutation.mutate(
-      {
-        soSystemId,
-        stockOutPackagingItems: items.map((it) => ({
-          sopProductId: it.productId,
-          sopPackSize: Number(it.packSize),
-          sopNoPack: Number(it.packNo),
-          sopProductQty: Number(it.packSize) * Number(it.packNo),
-          sopPackId: it.sopPackId,
-          packedBy: it.packedBy,
+    try {
+      const response = await createMutation.mutateAsync(
+        rows.map((row) => ({
+          soSystemId,
+          sopProductId: row.productId,
+          sopPackSize: parsePackingNumber(row.packSize),
+          sopNoPack: parsePackingNumber(row.packNo),
+          sopProductQty: parsePackingNumber(row.packQuantity),
+          sopPackId: row.sopPackId,
+          packedBy: row.packedBy,
         })),
-      },
-      {
-        onSuccess: () => {
-          showToast({ message: 'Packing defined successfully', type: 'success' })
-          navigate('/sticker-packing/orders')
-        },
-        onError: () => {
-          showToast({ message: 'Failed to save packing. Please try again.', type: 'error' })
-        },
-      },
-    )
+      )
+
+      const responseError = extractApiResponseErrorMessage(
+        response as
+          | {
+              errMsg?: string
+              message?: string
+              title?: string
+              errors?: Record<string, string[] | undefined> | null
+            }
+          | null
+          | undefined,
+      )
+
+      if (responseError) {
+        setServerError(responseError)
+        return
+      }
+
+      showToast({ message: 'Packing defined successfully', type: 'success' })
+      navigate('/sticker-packing/orders')
+    } catch (submitError) {
+      setServerError(extractApiErrorMessage(submitError))
+    }
   }
 
   if (loadingOrder || loadingPackTypes) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 size={22} className="animate-spin text-gray-400" />
-        <span className="ml-3 text-sm text-gray-500">Loading order…</span>
+        <Loader2 size={28} className="animate-spin text-gray-400" />
+        <span className="ml-3 text-sm text-gray-500">Loading packing data…</span>
       </div>
     )
   }
 
   if (orderError || !orderDetail) {
     return (
-      <div className="flex items-center justify-center gap-2 py-20 text-sm text-red-500">
-        <AlertCircle size={16} />
-        Failed to load sales order.
+      <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
+        <AlertCircle size={20} className="mt-0.5 shrink-0 text-red-500" />
+        <div>
+          <p className="text-sm font-medium text-red-800">Failed to load packing data</p>
+          <p className="mt-1 text-xs text-red-600">Sales order not found</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex items-start gap-3 border-b border-gray-100 pb-4">
-          <div className="rounded-xl bg-gray-100 p-3 text-gray-700">
-            <PackagePlus size={20} />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Define Packing</h2>
-            <p className="mt-0.5 text-sm text-gray-500">
-              {orderDetail.soSystemNo} — {orderDetail.customerName}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600 md:grid-cols-4">
-          <div>
-            <span className="font-medium text-gray-500">Invoice No</span>
-            <p className="text-gray-900">{orderDetail.soSystemNo}</p>
-          </div>
-          <div>
-            <span className="font-medium text-gray-500">Customer</span>
-            <p className="text-gray-900">{orderDetail.customerName}</p>
-          </div>
-          <div>
-            <span className="font-medium text-gray-500">Date</span>
-            <p className="text-gray-900">{orderDetail.invoiceDate?.slice(0, 10)}</p>
-          </div>
-          <div>
-            <span className="font-medium text-gray-500">Job Type</span>
-            <p className="text-gray-900">{orderDetail.jobType}</p>
-          </div>
+      <div className="flex items-center gap-3">
+        <Link
+          to="/sticker-packing/orders"
+          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          <ArrowLeft size={16} /> Back
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Define Sticker Packing</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            Complete pack sizes, pack types, employee assignment, and pack splits so sticker packing stays balanced per product.
+          </p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
-                <th className="px-3 py-3">Product</th>
-                <th className="px-3 py-3 text-right">Qty</th>
-                <th className="px-3 py-3">Pack Size</th>
-                <th className="px-3 py-3">Pack Type</th>
-                <th className="px-3 py-3">No. of Packs</th>
-                <th className="px-3 py-3 text-right">Pack Qty</th>
-                <th className="px-3 py-3">Packed By</th>
-                <th className="px-3 py-3 text-center">—</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <PackingItemRow
-                  key={item.index}
-                  item={item}
-                  packTypes={packTypes}
-                  employees={employees}
-                  onChange={handleChange}
-                  onDelete={handleDelete}
-                />
-              ))}
-            </tbody>
-          </table>
+      {serverError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {serverError}
         </div>
+      )}
 
-        <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-          <button
-            type="button"
-            onClick={handleAddRow}
-            className="text-sm text-gray-500 hover:text-gray-800 underline"
-          >
-            + Add row
-          </button>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <ArrowLeft size={14} />
-              Back
-            </button>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+        <SummaryMetric label="Order No" value={orderDetail.soSystemNo} />
+        <SummaryMetric label="Customer" value={orderDetail.customerName} />
+        <SummaryMetric label="Order Type" value={orderDetail.jobType} />
+        <SummaryMetric label="Validation" value={validation.isValid ? 'Ready to save' : 'Needs correction'} />
+        <SummaryMetric label="Products" value={String(summary.productCount)} />
+        <SummaryMetric label="Rows" value={String(summary.rowCount)} />
+        <SummaryMetric label="Order Qty" value={formatPackingNumber(summary.totalOrderQty)} />
+        <SummaryMetric label="Packed Qty" value={formatPackingNumber(summary.totalPackedQty)} />
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="mb-5 max-w-sm">
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Pack Type
+            </label>
+            <div className="mt-2">
+              <SearchableSelect
+                options={packTypeOptions}
+                value={globalPackTypeId}
+                onValueChange={handleGlobalPackTypeChange}
+                placeholder="Select pack type for all"
+                ariaLabel="Global pack type"
+                disabled={rows.length === 0 || packTypeOptions.length === 0}
+                className="px-3 py-2 text-sm"
+                emptyMessage="No pack type options found"
+              />
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Applying a value here updates the pack type for every row in the packaging grid.
+            </p>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-[1240px] text-sm">
+                <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  <tr>
+                    <th className="min-w-[180px] px-3 py-3">Product</th>
+                    <th className="min-w-[110px] px-3 py-3">Order Qty</th>
+                    <th className="min-w-[90px] px-3 py-3 text-center">Auto Fill</th>
+                    <th className="min-w-[120px] px-3 py-3">Pack Size</th>
+                    <th className="min-w-[220px] px-3 py-3">Pack Type</th>
+                    <th className="min-w-[110px] px-3 py-3">Pack No</th>
+                    <th className="min-w-[120px] px-3 py-3">Pack Qty</th>
+                    <th className="min-w-[220px] px-3 py-3">Packed By</th>
+                    <th className="min-w-[120px] px-3 py-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {rows.map((row) => (
+                    <tr key={row.index} className="align-top">
+                      <td className="px-3 py-3 font-medium text-gray-900">
+                        <span className="block truncate" title={row.productName}>{row.productName}</span>
+                      </td>
+                      <td className="px-3 py-3 text-gray-700">{formatPackingNumber(row.quantity)}</td>
+                      <td className="px-3 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isAutoFilled(row)}
+                          disabled={row.delete === 1 || row.quantity <= 0}
+                          onChange={(event) => handleAutoFill(row.index, event.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.0001"
+                          value={row.packSize}
+                          onChange={(event) => handleFieldChange(row.index, 'packSize', event.target.value)}
+                          className={inputCls}
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <SearchableSelect
+                          options={packTypeOptions}
+                          value={row.sopPackId ?? ''}
+                          onValueChange={(value) =>
+                            handleFieldChange(
+                              row.index,
+                              'sopPackId',
+                              value,
+                            )
+                          }
+                          placeholder="Select pack type"
+                          ariaLabel={`${row.productName} pack type`}
+                          className="px-3 py-2 text-sm"
+                          emptyMessage="No pack type options found"
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={row.packNo}
+                          onChange={(event) => handleFieldChange(row.index, 'packNo', event.target.value)}
+                          className={inputCls}
+                        />
+                      </td>
+                      <td className="px-3 py-3 font-medium text-gray-900">{row.packQuantity || '0.0000'}</td>
+                      <td className="px-3 py-3">
+                        <SearchableSelect
+                          options={employeeSelectOptions}
+                          value={row.packedBy}
+                          onValueChange={(value) =>
+                            handleFieldChange(
+                              row.index,
+                              'packedBy',
+                              value,
+                            )
+                          }
+                          placeholder="Select employee"
+                          ariaLabel={`${row.productName} packed by`}
+                          className="px-3 py-2 text-sm"
+                          emptyMessage="No employee options found"
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        {row.delete === 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemove(row.index)}
+                            className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2.5 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50"
+                          >
+                            <Trash2 size={14} /> Remove
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400">Base row</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center gap-3">
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={createMutation.isPending || items.length === 0}
-              className="flex items-center gap-1.5 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+              disabled={createMutation.isPending}
+              className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {createMutation.isPending ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Save size={14} />
-              )}
-              Save Packing
+              {createMutation.isPending && <Loader2 size={16} className="animate-spin" />}
+              <Save size={16} /> Save packing
             </button>
           </div>
-        </div>
       </div>
     </div>
   )

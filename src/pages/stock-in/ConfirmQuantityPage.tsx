@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, AlertCircle, Loader2 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Controller, useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm, useWatch, type FieldErrors, type SubmitErrorHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useStockInChallan, useStockInDetail, useConfirmStockInQty } from '@/hooks/useStockIn'
 import { normalizeStockInItemForForm } from '@/pages/stock-in/stockInMappers'
@@ -40,6 +40,102 @@ function extractLoadError(error: unknown): string {
   return extractError(error)
 }
 
+type SubmitErrorState = {
+  message: string
+  details?: string
+}
+
+const confirmQtyFieldLabels: Record<string, string> = {
+  sidConfirmedQty: 'confirmed qty',
+  sidConfirmedUnitPrice: 'confirmed price',
+}
+
+function stringifyDebugValue(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined
+
+  if (typeof value === 'string') {
+    const normalized = value.trim()
+    return normalized.length > 0 ? normalized : undefined
+  }
+
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return undefined
+  }
+}
+
+function extractErrorDetails(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object' || !('body' in error)) {
+    return undefined
+  }
+
+  const details = stringifyDebugValue((error as { body?: unknown }).body)
+  if (!details) {
+    return undefined
+  }
+
+  return details === extractError(error) ? undefined : details
+}
+
+function formatValidationPath(path: string[]) {
+  const [root, index, field] = path
+  if (root === 'items' && index !== undefined) {
+    const rowNumber = Number(index) + 1
+    const label = confirmQtyFieldLabels[field ?? ''] ?? field ?? 'field'
+    return `Row ${rowNumber} ${label}`
+  }
+
+  return path.join('.')
+}
+
+function collectValidationIssues(value: unknown, path: string[] = []): string[] {
+  if (!value || typeof value !== 'object') {
+    return []
+  }
+
+  const record = value as Record<string, unknown>
+  const message = record.message
+  if (typeof message === 'string' && message.trim()) {
+    const issuePath = formatValidationPath(path)
+    return [issuePath ? `${issuePath}: ${message}` : message]
+  }
+
+  return Object.entries(record).flatMap(([key, child]) => collectValidationIssues(child, [...path, key]))
+}
+
+function buildValidationErrorState(errors: FieldErrors<ConfirmQtyFormData>): SubmitErrorState {
+  const issues = collectValidationIssues(errors)
+  if (issues.length === 0) {
+    return {
+      message: 'Submission blocked by validation. Please review the highlighted rows.',
+    }
+  }
+
+  return {
+    message: `Submission blocked by validation: ${issues[0]}`,
+    details: issues.length > 1 ? issues.join('\n') : undefined,
+  }
+}
+
+function focusFirstInvalidField() {
+  if (typeof document === 'undefined') {
+    return
+  }
+
+  window.requestAnimationFrame(() => {
+    const firstInvalidField = document.querySelector<HTMLElement>('[aria-invalid="true"]')
+    if (!firstInvalidField) {
+      return
+    }
+
+    firstInvalidField.focus()
+    if (typeof firstInvalidField.scrollIntoView === 'function') {
+      firstInvalidField.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  })
+}
+
 function mapChallanToOrderDetail(
   challan: ReturnType<typeof useStockInChallan>['data'],
 ): StockInOrderDetail | undefined {
@@ -48,14 +144,15 @@ function mapChallanToOrderDetail(
   return {
     stockInGeneralData: challan.stockInGeneralData,
     stockInBillData: challan.stockInBillData,
-    stockInItemsData: (challan.stockInItemsData ?? []).map((item) => ({
-      ...item,
-      sidProductStrength: null,
-      sidBatches: [],
-      sidPacks: [],
-      sidMappedProductId: null,
-      sidMappedProductName: null,
-    })),
+stockInItemsData: (challan.stockInItemsData ?? []).map((item) => ({
+  ...item,
+  sidProductStrength: null,
+  sidBatches: [],
+  sidPacks: [],
+  sidMappedProductId: item.sidMappedProductId ?? null,
+  mappedProductName: item.mappedProductName ?? null,
+  sidMappedProductName: item.sidMappedProductName ?? item.mappedProductName ?? null,
+})),
   }
 }
 
@@ -78,7 +175,22 @@ function formatQuantity(value: number) {
   const rounded = Number(value.toFixed(3))
   return Number.isInteger(rounded) ? String(rounded) : String(rounded)
 }
+function getMappedProductText(item: {
+  mappedProductName?: string | null
+  sidMappedProductName?: string | null
+  sidMappedProductId?: number | null
+}) {
+  const mappedProductName =
+    item.mappedProductName?.trim() ||
+    item.sidMappedProductName?.trim() ||
+    null
 
+  if (mappedProductName) return mappedProductName
+
+  if (item.sidMappedProductId) return `Mapped Product #${item.sidMappedProductId}`
+
+  return '—'
+}
 export function ConfirmQuantityPage() {
   const { id } = useParams<{ id: string }>()
   const orderId = Number(id)
@@ -90,7 +202,7 @@ export function ConfirmQuantityPage() {
     Number.isFinite(orderId) && orderId > 0 && !detailQuery.isLoading && !detailQuery.data,
   )
   const confirmMutation = useConfirmStockInQty()
-  const [serverError, setServerError] = useState<string>()
+  const [submitError, setSubmitError] = useState<SubmitErrorState>()
   const [confirmedPriceInputs, setConfirmedPriceInputs] = useState<Record<number, string>>({})
 
   const detail = useMemo(
@@ -118,6 +230,7 @@ export function ConfirmQuantityPage() {
     register,
     handleSubmit,
     control,
+    getValues,
     formState: { errors },
   } = useForm<ConfirmQtyFormData>({
     resolver: zodResolver(confirmQtySchema),
@@ -129,23 +242,52 @@ export function ConfirmQuantityPage() {
     setConfirmedPriceInputs({})
   }, [detail])
 
+  const summaryItems = watchedItems ?? defaultValues?.items ?? []
+  const totalDeclared = useMemo(
+    () => summaryItems.reduce((sum, item) => sum + Number(item.sidDeclaredQty ?? 0), 0),
+    [summaryItems],
+  )
+  const totalConfirmed = useMemo(
+    () => summaryItems.reduce((sum, item) => sum + Number(item.sidConfirmedQty ?? 0), 0),
+    [summaryItems],
+  )
+
   async function onSubmit(values: ConfirmQtyFormData) {
-    setServerError(undefined)
+    setSubmitError(undefined)
     try {
-      const items = values.items.map((item) => ({
-        sidProductId: item.sidProductId,
-        sidConfirmedQty: item.sidConfirmedQty,
-        sidConfirmedUnitPrice: item.sidConfirmedUnitPrice,
-      }))
+   const items = values.items.map((item) => ({
+  sidProductId: item.sidProductId,
+  sidConfirmedQty: item.sidConfirmedQty,
+  sidConfirmedUnitPrice: item.sidConfirmedUnitPrice,
+  sidMappedProductId: item.sidMappedProductId ?? null,
+}))
       const response = await confirmMutation.mutateAsync({ id: orderId, items })
       if ((response as { errMsg?: string })?.errMsg) {
-        setServerError((response as { errMsg: string }).errMsg)
+        const details = stringifyDebugValue(response)
+        setSubmitError({
+          message: (response as { errMsg: string }).errMsg,
+          details,
+        })
         return
       }
       navigate('/stock-in/confirm-qty')
     } catch (error) {
-      setServerError(extractError(error))
+      console.error('Confirm qty submission failed', { orderId, error, values })
+      setSubmitError({
+        message: extractError(error),
+        details: extractErrorDetails(error),
+      })
     }
+  }
+
+  const onInvalidSubmit: SubmitErrorHandler<ConfirmQtyFormData> = (formErrors) => {
+    console.error('Confirm qty submission blocked by validation', {
+      orderId,
+      formErrors,
+      values: getValues(),
+    })
+    setSubmitError(buildValidationErrorState(formErrors))
+    focusFirstInvalidField()
   }
 
   if (isLoading) {
@@ -173,15 +315,6 @@ export function ConfirmQuantityPage() {
   const b = detail.stockInBillData
   const isLoan = (g.jobTypeName ?? '').toLowerCase().includes('loan')
   const currencyPrefix = getCurrencyPrefix(b.sibCurrencyName)
-  const summaryItems = watchedItems ?? defaultValues?.items ?? []
-  const totalDeclared = useMemo(
-    () => summaryItems.reduce((sum, item) => sum + Number(item.sidDeclaredQty ?? 0), 0),
-    [summaryItems],
-  )
-  const totalConfirmed = useMemo(
-    () => summaryItems.reduce((sum, item) => sum + Number(item.sidConfirmedQty ?? 0), 0),
-    [summaryItems],
-  )
 
   return (
     <div className="space-y-6">
@@ -230,7 +363,7 @@ export function ConfirmQuantityPage() {
       </div>
 
       {/* Confirmation Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit, onInvalidSubmit)} className="space-y-4">
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -246,7 +379,11 @@ export function ConfirmQuantityPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {(defaultValues?.items ?? []).map((item, index) => (
+                {(defaultValues?.items ?? []).map((item, index) => {
+                  const priceError = errors.items?.[index]?.sidConfirmedUnitPrice
+                  const qtyError = errors.items?.[index]?.sidConfirmedQty
+
+                  return (
                   <tr key={item.sidProductId} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-500">{index + 1}</td>
                     <td className="px-4 py-3">
@@ -255,11 +392,24 @@ export function ConfirmQuantityPage() {
                         <span className="ml-1 text-xs text-gray-500">({item.sidProductStrength})</span>
                       )}
                     </td>
-                    {isLoan && (
-                      <td className="px-4 py-3 text-gray-700">
-                        {item.sidMappedProductName ?? '—'}
-                      </td>
-                    )}
+                {isLoan && (
+  <td className="px-4 py-3 text-gray-700">
+    {getMappedProductText({
+      mappedProductName:
+        detail?.stockInItemsData?.[index]?.mappedProductName ??
+        detail?.stockInItemsData?.[index]?.sidMappedProductName ??
+        null,
+      sidMappedProductName:
+        detail?.stockInItemsData?.[index]?.sidMappedProductName ??
+        detail?.stockInItemsData?.[index]?.mappedProductName ??
+        null,
+      sidMappedProductId:
+        item.sidMappedProductId ??
+        detail?.stockInItemsData?.[index]?.sidMappedProductId ??
+        null,
+    })}
+  </td>
+)}
                     <td className="px-4 py-3 text-right text-gray-600">
                       {item.sidDeclaredUnitPrice?.toFixed(4)}
                     </td>
@@ -279,6 +429,8 @@ export function ConfirmQuantityPage() {
                               type="text"
                               inputMode="decimal"
                               value={displayValue}
+                              aria-invalid={priceError ? 'true' : 'false'}
+                              aria-describedby={priceError ? `confirm-price-error-${index}` : undefined}
                               onChange={(event) => {
                                 const nextValue = event.target.value
                                 setConfirmedPriceInputs((prev) => ({
@@ -296,14 +448,14 @@ export function ConfirmQuantityPage() {
                                 }))
                                 field.onBlur()
                               }}
-                              className={inputCls + ' w-28 text-right'}
+                              className={`${inputCls} w-28 text-right${priceError ? ' border-red-300 focus:border-red-400 focus:ring-red-100' : ''}`}
                             />
                           )
                         }}
                       />
-                      {errors.items?.[index]?.sidConfirmedUnitPrice && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {String(errors.items[index]?.sidConfirmedUnitPrice?.message)}
+                      {priceError && (
+                        <p id={`confirm-price-error-${index}`} className="mt-1 text-xs text-red-600">
+                          {String(priceError.message)}
                         </p>
                       )}
                     </td>
@@ -315,19 +467,21 @@ export function ConfirmQuantityPage() {
                         type="number"
                         step="0.001"
                         min="0"
+                        aria-invalid={qtyError ? 'true' : 'false'}
+                        aria-describedby={qtyError ? `confirm-qty-error-${index}` : undefined}
                         {...register(`items.${index}.sidConfirmedQty`, {
                           setValueAs: (v) => (v === '' ? 0 : Number(v)),
                         })}
-                        className={inputCls + ' w-24 text-right'}
+                        className={`${inputCls} w-24 text-right${qtyError ? ' border-red-300 focus:border-red-400 focus:ring-red-100' : ''}`}
                       />
-                      {errors.items?.[index]?.sidConfirmedQty && (
-                        <p className="mt-1 text-xs text-red-600">
-                          {String(errors.items[index]?.sidConfirmedQty?.message)}
+                      {qtyError && (
+                        <p id={`confirm-qty-error-${index}`} className="mt-1 text-xs text-red-600">
+                          {String(qtyError.message)}
                         </p>
                       )}
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -369,9 +523,17 @@ export function ConfirmQuantityPage() {
           </div>
         </div>
 
-        {serverError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {serverError}
+        {submitError && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <p className="font-medium">{submitError.message}</p>
+            {submitError.details && (
+              <details className="mt-2 text-xs text-red-800">
+                <summary className="cursor-pointer font-medium">Debug details</summary>
+                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded border border-red-200 bg-white/70 p-3">
+                  {submitError.details}
+                </pre>
+              </details>
+            )}
           </div>
         )}
 
@@ -379,7 +541,7 @@ export function ConfirmQuantityPage() {
           <button
             type="submit"
             disabled={confirmMutation.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-6 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {confirmMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Confirm Received Quantities

@@ -23,6 +23,8 @@ import type {
   StockInChallanItem,
   StockInGeneralData,
   StockInLookupOption,
+  StockInLastPriceItem,
+  StockInLastPriceRequest,
 } from '@/types/stockIn'
 import { LIST_MODE_CONFIG } from '@/features/stock-in/modes'
 
@@ -125,6 +127,7 @@ function normalizeStockInChallan(data: unknown): StockInChallan | undefined {
       ? (data.stockInItemsData as StockInChallanItem[])
       : [],
     stockInBillData: normalizeStockInBillData(billSource),
+    notes: toNullableString(data.notes),
   }
 }
 
@@ -158,6 +161,27 @@ function buildStockInListUrl(mode: StockInListMode): string {
   return `/StockIn/StockInOrderGridData/${statusCode}`
 }
 
+export function buildStockInInvoiceListUrl(filters: StockInInvoiceFilters): string {
+  const { supplierId = 0, customerId = 0, jobTypeId, startDate, endDate } = filters
+  const params = new URLSearchParams()
+
+  if (startDate) {
+    params.set('startDate', startDate)
+  }
+
+  if (endDate) {
+    params.set('endDate', endDate)
+  }
+
+  if (jobTypeId != null && jobTypeId > 0) {
+    params.set('jobTypeId', String(jobTypeId))
+  }
+
+  const queryString = params.toString()
+  const basePath = `/StockIn/GetStockInInvoiceList/${supplierId}/${customerId}`
+  return queryString ? `${basePath}?${queryString}` : basePath
+}
+
 // ── Query Key Factory ─────────────────────────────────────────
 export const stockInKeys = {
   all: ['stockIn'] as const,
@@ -175,6 +199,8 @@ export const stockInKeys = {
     [...stockInKeys.all, 'current-stock', productId, channelId] as const,
   batchAndMappedItems: (productId: number) =>
     [...stockInKeys.all, 'batch-mapped', productId] as const,
+  last3Price: (filters: StockInLastPriceRequest) =>
+    [...stockInKeys.all, 'last-3-price', filters] as const,
 }
 
 // ── Query Hooks ───────────────────────────────────────────────
@@ -218,14 +244,11 @@ export function useStockInDetail(id: number | undefined) {
 }
 
 export function useStockInInvoiceList(filters: StockInInvoiceFilters, enabled = false) {
-  const { supplierId = 0, customerId = 0 } = filters
   return useQuery({
     queryKey: stockInKeys.invoiceList(filters),
     queryFn: () =>
       apiClient
-        .get<StockInApiResponse<StockInInvoiceListRow[]>>(
-          `/StockIn/GetStockInInvoiceList/${supplierId}/${customerId}`,
-        )
+        .get<StockInApiResponse<StockInInvoiceListRow[]>>(buildStockInInvoiceListUrl(filters))
         .then((response) => response.dataObj ?? []),
     enabled,
     staleTime: 60_000,
@@ -318,6 +341,26 @@ export function useStockInBatchAndMappedItems(productId: number | undefined) {
       }
     },
     enabled: !!productId,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+}
+
+export function useStockInLast3Price(
+  filters: StockInLastPriceRequest,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: stockInKeys.last3Price(filters),
+    queryFn: () =>
+      apiClient
+        .post<StockInApiResponse<StockInLastPriceItem[]>>('/StockIn/GetStockInLast3Price', {
+          productId: filters.productId,
+          customerId: filters.customerId ?? null,
+          supplierId: filters.supplierId ?? null,
+        })
+        .then((response) => response.dataObj ?? []),
+    enabled: enabled && filters.productId > 0,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   })

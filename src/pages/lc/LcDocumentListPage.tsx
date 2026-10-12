@@ -84,14 +84,14 @@ export function LcDocumentListPage() {
                           <button
                             type="button"
                             onClick={() => setViewLcId(pi.lcDocId ?? pi.piSystemId)}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-view inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <Eye size={12} /> View
                           </button>
                           <button
                             type="button"
                             onClick={() => navigate(`/lc/${pi.lcDocId ?? pi.piSystemId}/update`)}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-update inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <FileEdit size={12} /> Update Doc
                           </button>

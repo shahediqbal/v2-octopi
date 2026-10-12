@@ -1,73 +1,37 @@
-# React + TypeScript + Vite
+# Octopi V2
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+V2 ERP frontend built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## Safe Deployment Workflow
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This project now follows the same safe pattern as the legacy app: build separate frontend bundles for production and staging/training.
 
-## React Compiler
+- `npm run build:production`
+  Creates `erptzbuild/` for `tradezentrum.com`
+  Uses `https://api.tradezentrum.com/api`
+- `npm run build:staging`
+  Creates `erpalgobuild/` for `erp.algologix.com.bd`
+  Uses `https://api-v2.algologix.com.bd/api`
+- `npm run build:all`
+  Creates both outputs in one run
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Environment Files
 
-## Expanding the ESLint configuration
+- `.env.production` -> production API and production mode
+- `.env.staging` -> training/staging API and staging mode
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+The shared runtime env reader is in `src/config/env.ts` and all API calls flow through `src/lib/api.ts`.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Local Development
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- `npm run dev`
+- `npm run test`
+- `npm run lint`
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Deployment Notes
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- Upload `erptzbuild/` to the live production server
+- Upload `erpalgobuild/` to the training/staging server
+- Do not reuse the same built folder across both servers because each build targets a different backend API
+- The server must rewrite SPA routes to `index.html`
+- Use `docs/release-checklist.md` for the final pre-upload checks

@@ -120,4 +120,116 @@ describe('ConfirmQuantityPage summary', () => {
       expect(screen.getByText('120 Kg')).toBeTruthy()
     })
   })
+
+  it('keeps the hook order stable when the first render loads and the second render has data', async () => {
+    const loadedResponse = mockUseStockInDetail()
+    const detailState = {
+      data: undefined,
+      isLoading: true,
+      error: null,
+    }
+
+    mockUseStockInDetail.mockImplementation(() => detailState)
+
+    const renderPage = () => (
+      <MemoryRouter initialEntries={['/stock-in/8524/confirm-qty']}>
+        <Routes>
+          <Route path="/stock-in/:id/confirm-qty" element={<ConfirmQuantityPage />} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    const { rerender } = render(renderPage())
+
+    detailState.data = loadedResponse.data
+    detailState.isLoading = false
+
+    rerender(renderPage())
+
+    await waitFor(() => {
+      expect(screen.getByText('Total Confirmed:')).toBeTruthy()
+    })
+  })
+
+  it('surfaces a validation banner when malformed invoice data blocks submission before the request is sent', async () => {
+    const mutateAsync = vi.fn()
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    mockUseStockInDetail.mockReturnValue({
+      data: {
+        stockInGeneralData: {
+          siSystemId: 9078,
+          siSystemNo: 'SI-09078',
+          siInvoiceNo: 'INV-9078',
+          siInvoiceDate: '2026-06-03T00:00:00',
+          siJobTypeId: 2,
+          jobTypeName: 'Regular_Purchase',
+          siRemarks: 'Malformed confirmed price for regression coverage',
+          siSourceChannelId: 1,
+          siSourceChannelName: 'Factory',
+          siDestinationChannelId: 2,
+          siDestinationChannelName: 'Warehouse',
+          siSupplierId: 200,
+          supplierName: 'ACME Pharma',
+          supplierAddress: null,
+          siCustomerId: null,
+          customerName: null,
+          customerAddress: null,
+          siInvoiceReceiveStatus: true,
+          siInvoiceReceiveDate: '2026-06-03T00:00:00',
+        },
+        stockInItemsData: [
+          {
+            sidId: 1,
+            sidProductId: 1001,
+            productName: 'Raw Material A',
+            sidDeclaredQty: 123,
+            sidConfirmedQty: 123,
+            sidDeclaredUnitPrice: 111,
+            sidConfirmedUnitPrice: Number.NaN,
+            sidProductStrength: null,
+            sidBatches: [],
+            sidPacks: [],
+            sidMappedProductId: null,
+            sidMappedProductName: null,
+          },
+        ],
+        stockInBillData: {
+          sibCalculatedAmount: 13653,
+          sibDiscountAmouunt: 0,
+          sibAdjustedAmount: 0,
+          sibFinalAmount: 13653,
+          sibCurrencyName: 'BDT',
+        },
+      },
+      isLoading: false,
+      error: null,
+    })
+
+    mockUseConfirmStockInQty.mockReturnValue({
+      mutateAsync,
+      isPending: false,
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/stock-in/9078/confirm-qty']}>
+        <Routes>
+          <Route path="/stock-in/:id/confirm-qty" element={<ConfirmQuantityPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Received Quantities' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeTruthy()
+      expect(screen.getByText(/Submission blocked by validation/i)).toBeTruthy()
+      expect(screen.getByText(/Row 1 confirmed price/i)).toBeTruthy()
+    })
+
+    expect(consoleErrorSpy).toHaveBeenCalled()
+    expect(mutateAsync).not.toHaveBeenCalled()
+
+    consoleErrorSpy.mockRestore()
+  })
 })

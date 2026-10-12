@@ -174,7 +174,7 @@ export function EditTaxDutyPage() {
             <button
               type="submit"
               disabled={updateMutation.isPending}
-              className="flex items-center gap-1.5 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+              className="action-update flex items-center gap-1.5 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
             >
               {updateMutation.isPending && <Loader2 size={14} className="animate-spin" />}
               Update

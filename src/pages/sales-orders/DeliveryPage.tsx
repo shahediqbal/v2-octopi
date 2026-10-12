@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
@@ -16,6 +16,7 @@ import {
 import {
   useDeliveryTaskList,
   useTaskDetail,
+  useTaskVehicles,
   useStartTask,
   useEndTask,
   useCompleteChecklist,
@@ -24,8 +25,8 @@ import {
   useDeleteTransport,
   useMarkDestinationReached,
 } from '@/hooks/useTask'
-import { useDropdown } from '@/hooks/useDropdown'
 import { PaginatedCombobox } from '@/components/dropdowns'
+import { useToastStore } from '@/stores/toastStore'
 import type { TaskTransportItem } from '@/types/task'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,16 +35,19 @@ import type { TaskTransportItem } from '@/types/task'
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function DeliveryPage() {
+  const showToast = useToastStore((s) => s.showToast)
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null)
   const [showAddTransport, setShowAddTransport] = useState(false)
   const [editingTransport, setEditingTransport] = useState<TaskTransportItem | null>(null)
   const [showCongrats, setShowCongrats] = useState(false)
+  const [dialog, setDialog] = useState<DeliveryDialogState | null>(null)
 
   const {
     data: tasks = [],
     isLoading: loadingTasks,
     refetch: refetchTasks,
   } = useDeliveryTaskList()
+  const { data: vehicleOptions = [] } = useTaskVehicles()
   const { data: taskDetail, isLoading: loadingDetail } = useTaskDetail(
     activeTaskId ?? undefined,
   )
@@ -95,65 +99,110 @@ export function DeliveryPage() {
   const handleStart = () => {
     if (!activeTaskId || isStarted || isEnded) return
     if (hasUnreachedTransport) {
-      alert('You have not clicked the Reached button for all transports!')
+      setDialog({
+        kind: 'info',
+        title: 'Transport Pending',
+        message: 'You have not clicked the Reached button for all transports!',
+        confirmLabel: 'OK',
+        confirmCls: 'bg-amber-600 hover:bg-amber-500',
+      })
       return
     }
-    if (!window.confirm(`Start task "${activeTask?.taskName}"?`)) return
-    startTask.mutate(activeTaskId)
+    setDialog({
+      kind: 'confirm',
+      title: 'Start Task',
+      message: `Start task "${activeTask?.taskName}"?`,
+      confirmLabel: 'Start Task',
+      confirmCls: 'bg-green-600 hover:bg-green-500',
+      onConfirm: () => startTask.mutate(activeTaskId),
+    })
   }
 
   const handleAccomplish = async () => {
     if (!activeTaskId || !isStarted) return
     if (hasUnreachedTransport) {
-      alert('You have not clicked the Reached button for all transports!')
+      setDialog({
+        kind: 'info',
+        title: 'Transport Pending',
+        message: 'You have not clicked the Reached button for all transports!',
+        confirmLabel: 'OK',
+        confirmCls: 'bg-amber-600 hover:bg-amber-500',
+      })
       return
     }
-    if (!allChecklistsDone) {
-      alert('You must complete all checklists before accomplishing this task.')
-      return
-    }
-    if (!window.confirm(`Are you sure "${activeTask?.taskName}" is complete?`)) return
+    const confirmMsg = allChecklistsDone
+      ? `Are you sure "${activeTask?.taskName}" is complete?`
+      : `Some checklists are still pending. Are you sure you want to accomplish "${activeTask?.taskName}" anyway?`
+    setDialog({
+      kind: 'confirm',
+      title: 'Accomplish Task',
+      message: confirmMsg,
+      confirmLabel: 'Accomplish',
+      confirmCls: 'bg-gray-900 hover:bg-gray-700',
+      onConfirm: async () => {
+        await endTask.mutateAsync(activeTaskId)
 
-    await endTask.mutateAsync(activeTaskId)
-
-    // Auto-advance to next pending task — mirrors legacy AddDelivery behavior
-    const nextTask = tasks.find(
-      (t) => t.taskStartTime == null && t.taskEndTime == null && t.taskId !== activeTaskId,
-    )
-    if (nextTask) {
-      setActiveTaskId(nextTask.taskId)
-    } else {
-      setShowCongrats(true)
-      // Remain on the accomplished task so the finished badge is visible
-    }
+        // Auto-advance to next pending task — mirrors legacy AddDelivery behavior
+        const nextTask = tasks.find(
+          (t) => t.taskStartTime == null && t.taskEndTime == null && t.taskId !== activeTaskId,
+        )
+        if (nextTask) {
+          setActiveTaskId(nextTask.taskId)
+        } else {
+          setShowCongrats(true)
+          // Remain on the accomplished task so the finished badge is visible
+        }
+      },
+    })
   }
 
   const handleCompleteChecklist = (checklistAutoId: number | undefined) => {
     if (!activeTaskId || !checklistAutoId) return
-    if (!isStarted) {
-      alert('You must start the task before completing a checklist.')
-      return
-    }
-    if (!window.confirm('Mark this checklist item as complete?')) return
-    completeChecklist.mutate({ checklistAutoId, taskId: activeTaskId })
+    if (isEnded) return
+    setDialog({
+      kind: 'confirm',
+      title: 'Complete Checklist',
+      message: 'Mark this checklist item as complete?',
+      confirmLabel: 'Mark Complete',
+      confirmCls: 'bg-gray-900 hover:bg-gray-700',
+      onConfirm: () => completeChecklist.mutate({ checklistAutoId, taskId: activeTaskId }),
+    })
   }
 
-  const handleDeleteTransport = (transportationId: number) => {
+  const handleDeleteTransport = async (transportationId: number) => {
     if (!activeTaskId) return
-    if (!window.confirm('Delete this transport record?')) return
-    deleteTransport.mutate({ transportationId, taskId: activeTaskId })
+    setDialog({
+      kind: 'confirm',
+      title: 'Delete Transport',
+      message: 'Delete this transport record? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      confirmCls: 'bg-red-600 hover:bg-red-700',
+      onConfirm: async () => {
+        try {
+          await deleteTransport.mutateAsync({ transportationId, taskId: activeTaskId })
+        } catch {
+          showToast({ message: 'Failed to delete transport record', type: 'error' })
+        }
+      },
+    })
   }
 
   const handleMarkReached = (transport: TaskTransportItem) => {
     if (!activeTaskId) return
-    if (!window.confirm(`Mark "${transport.taskTransportationEndLocation}" as reached?`))
-      return
-    markReached.mutate({
-      taskId: activeTaskId,
-      taskTransportationAutoId: transport.taskTransportationAutoId,
-      taskTransportationEndLat: 0,
-      taskTransportationEndLong: 0,
-      taskTransportationEndLocation: transport.taskTransportationEndLocation ?? '',
+    setDialog({
+      kind: 'confirm',
+      title: 'Mark Destination Reached',
+      message: `Mark "${transport.taskTransportationEndLocation}" as reached?`,
+      confirmLabel: 'Reached',
+      confirmCls: 'bg-amber-600 hover:bg-amber-500',
+      onConfirm: () =>
+        markReached.mutate({
+          taskId: activeTaskId,
+          taskTransportationAutoId: transport.taskTransportationAutoId,
+          taskTransportationEndLat: 0,
+          taskTransportationEndLong: 0,
+          taskTransportationEndLocation: transport.taskTransportationEndLocation ?? '',
+        }),
     })
   }
 
@@ -272,25 +321,41 @@ export function DeliveryPage() {
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
           {/* Task info bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-gray-900">
-                {activeTask.taskName ?? `Task #${activeTask.taskId}`}
-              </span>
-              {isEnded ? (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                  Accomplished
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-gray-900">
+                  {activeTask.taskName ?? `Task #${activeTask.taskId}`}
                 </span>
-              ) : isStarted ? (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                  In Progress
-                </span>
-              ) : (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-                  Not Started
-                </span>
-              )}
-              {activeTask.jobType && (
-                <span className="text-xs text-gray-400">{activeTask.jobType}</span>
+                {isEnded ? (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                    Accomplished
+                  </span>
+                ) : isStarted ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    In Progress
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                    Not Started
+                  </span>
+                )}
+                {activeTask.jobType && (
+                  <span className="text-xs text-gray-400">{activeTask.jobType}</span>
+                )}
+              </div>
+              {/* Invoice / Destination info — mirrors legacy CheckListItem info section */}
+              {!loadingDetail && taskDetail && (
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500">
+                  {taskDetail.soSystemNo && (
+                    <span>Invoice: <span className="font-semibold text-gray-700">{taskDetail.soSystemNo}</span></span>
+                  )}
+                  {taskDetail.taskDestination && (
+                    <span>Destination: <span className="font-semibold text-gray-700">{taskDetail.taskDestination}</span></span>
+                  )}
+                  {taskDetail.taskDestinationAddress && (
+                    <span>Address: <span className="font-semibold text-gray-700">{taskDetail.taskDestinationAddress}</span></span>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -336,7 +401,7 @@ export function DeliveryPage() {
                         {!done && (
                           <button
                             type="button"
-                            disabled={isBusy || !isStarted}
+                            disabled={isBusy || isEnded}
                             onClick={() => handleCompleteChecklist(item.taskChecklistAutoId)}
                             className="ml-3 flex items-center gap-1 rounded-md bg-gray-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
                           >
@@ -379,6 +444,7 @@ export function DeliveryPage() {
                 <div className="space-y-2">
                   {transports.map((transport) => {
                     const reached = transport.taskTransportationEndLat != null
+                    const vehicleLabel = resolveTransportVehicleLabel(transport, vehicleOptions)
                     return (
                       <div
                         key={transport.taskTransportationAutoId}
@@ -388,7 +454,7 @@ export function DeliveryPage() {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
                               <Truck className="h-3.5 w-3.5 text-gray-400" />
-                              {transport.vehicleName ?? `Vehicle #${transport.taskTransportationVehicleId}`}
+                              {vehicleLabel || 'Unknown vehicle'}
                             </div>
                             <div className="flex items-center gap-2 text-xs text-gray-500">
                               <span>{transport.taskTransportationStartLocation ?? '—'}</span>
@@ -424,7 +490,12 @@ export function DeliveryPage() {
                               <button
                                 type="button"
                                 disabled={isBusy}
-                                onClick={() => setEditingTransport(transport)}
+                                onClick={() =>
+                                  setEditingTransport({
+                                    ...transport,
+                                    vehicleName: vehicleLabel || transport.vehicleName,
+                                  })
+                                }
                                 className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-blue-50 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
                                 title="Edit"
                               >
@@ -435,7 +506,7 @@ export function DeliveryPage() {
                               type="button"
                               disabled={isBusy}
                               onClick={() =>
-                                handleDeleteTransport(transport.taskTransportationAutoId)
+                                void handleDeleteTransport(transport.taskTransportationAutoId)
                               }
                               className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
                               title="Delete"
@@ -502,6 +573,7 @@ export function DeliveryPage() {
       {/* Add Transport modal */}
       {showAddTransport && activeTaskId != null && (
         <TransportModal
+          key={`add-${activeTaskId}`}
           mode="add"
           taskId={activeTaskId}
           onClose={() => setShowAddTransport(false)}
@@ -511,15 +583,41 @@ export function DeliveryPage() {
       {/* Edit Transport modal — mirrors legacy EditTransport.js */}
       {editingTransport != null && activeTaskId != null && (
         <TransportModal
+          key={`edit-${editingTransport.taskTransportationAutoId}`}
           mode="edit"
           taskId={activeTaskId}
           existing={editingTransport}
           onClose={() => setEditingTransport(null)}
         />
       )}
+
+      {dialog && (
+        <DeliveryDialog
+          dialog={dialog}
+          onClose={() => setDialog(null)}
+          loading={dialog.kind === 'confirm' && isBusy}
+        />
+      )}
     </div>
   )
 }
+
+type DeliveryDialogState =
+  | {
+      kind: 'info'
+      title: string
+      message: string
+      confirmLabel?: string
+      confirmCls?: string
+    }
+  | {
+      kind: 'confirm'
+      title: string
+      message: string
+      onConfirm: () => void | Promise<void>
+      confirmLabel?: string
+      confirmCls?: string
+    }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified Add / Edit Transport modal
@@ -528,12 +626,111 @@ export function DeliveryPage() {
 
 interface TransportFormState {
   vehicleId: number | null
+  vehicleLabel: string
   fromLocationId: number | null
   fromLocationLabel: string
   toLocationId: number | null
   toLocationLabel: string
   fare: string
   remarks: string
+}
+
+interface TransportCoordinates {
+  latitude: number
+  longitude: number
+}
+
+interface GeolocationErrorLike {
+  code?: number
+  message?: string
+}
+
+function coerceOptionalNumber(value: number | string | null | undefined): number | null {
+  if (value == null || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function buildTransportFormState(
+  existing: TaskTransportItem | undefined,
+  vehicles: Array<{ key: number; value: string }> = [],
+): TransportFormState {
+  const vehicleId = coerceOptionalNumber(existing?.taskTransportationVehicleId)
+
+  return {
+    vehicleId,
+    vehicleLabel: getVehicleSelectLabel(vehicleId, existing?.vehicleName ?? '', vehicles),
+    fromLocationId: coerceOptionalNumber(existing?.taskTransportationStartLocationId),
+    fromLocationLabel: existing?.taskTransportationStartLocation ?? '',
+    toLocationId: coerceOptionalNumber(existing?.taskTransportationEndLocationId),
+    toLocationLabel: existing?.taskTransportationEndLocation ?? '',
+    fare:
+      existing?.taskTransportationCost != null ? String(existing.taskTransportationCost) : '',
+    remarks: existing?.taskTransportationRemarks ?? '',
+  }
+}
+
+function getVehicleSelectLabel(
+  vehicleId: number | null,
+  fallbackLabel: string,
+  vehicles: Array<{ key: number; value: string }>,
+): string {
+  if (vehicleId == null) return fallbackLabel
+  const matchedVehicle = vehicles.find((vehicle) => String(vehicle.key) === String(vehicleId))
+  if (matchedVehicle?.value) return matchedVehicle.value
+  if (fallbackLabel.trim().length > 0) return fallbackLabel
+  return `Vehicle #${vehicleId}`
+}
+
+function resolveTransportVehicleLabel(
+  transport: TaskTransportItem,
+  vehicles: Array<{ key: number; value: string }>,
+): string {
+  return getVehicleSelectLabel(
+    coerceOptionalNumber(transport.taskTransportationVehicleId),
+    transport.vehicleName ?? '',
+    vehicles,
+  )
+}
+
+function requestCurrentTransportCoordinates(): Promise<TransportCoordinates> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    return Promise.reject(new Error('Location access is not supported in this browser.'))
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        }),
+      (error) => reject(error),
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      },
+    )
+  })
+}
+
+function getTransportLocationErrorMessage(error: unknown): string {
+  const geolocationError = error as GeolocationErrorLike | null | undefined
+
+  switch (geolocationError?.code) {
+    case 1:
+      return 'Location permission is required to save transportation.'
+    case 2:
+      return 'Unable to determine your current location. Please try again.'
+    case 3:
+      return 'Location request timed out. Please try again.'
+    default:
+      if (error instanceof Error && error.message.trim().length > 0) {
+        return error.message
+      }
+      return 'Unable to access your current location. Please try again.'
+  }
 }
 
 function TransportModal({
@@ -547,22 +744,49 @@ function TransportModal({
   existing?: TaskTransportItem
   onClose: () => void
 }) {
-  const [form, setForm] = useState<TransportFormState>(() => ({
-    vehicleId: existing?.taskTransportationVehicleId ?? null,
-    fromLocationId: existing?.taskTransportationStartLocationId ?? null,
-    fromLocationLabel: existing?.taskTransportationStartLocation ?? '',
-    toLocationId: existing?.taskTransportationEndLocationId ?? null,
-    toLocationLabel: existing?.taskTransportationEndLocation ?? '',
-    fare:
-      existing?.taskTransportationCost != null ? String(existing.taskTransportationCost) : '',
-    remarks: existing?.taskTransportationRemarks ?? '',
-  }))
+  const { data: vehicles = [], isLoading: loadingVehicles } = useTaskVehicles()
+  const [form, setForm] = useState<TransportFormState>(() =>
+    buildTransportFormState(existing, vehicles),
+  )
   const [formError, setFormError] = useState<string | null>(null)
-
-  const { data: vehicles = [], isLoading: loadingVehicles } = useDropdown('vehicle')
   const addTransport = useAddTransport()
   const updateTransport = useUpdateTransport()
   const isPending = addTransport.isPending || updateTransport.isPending
+  const selectedVehicleValue = form.vehicleId != null ? String(form.vehicleId) : ''
+  const selectedVehicleLabel = useMemo(
+    () =>
+      getVehicleSelectLabel(
+        form.vehicleId,
+        form.vehicleLabel || existing?.vehicleName || '',
+        vehicles,
+      ),
+    [existing?.vehicleName, form.vehicleId, form.vehicleLabel, vehicles],
+  )
+  const hasVehicleOption = useMemo(
+    () =>
+      form.vehicleId != null &&
+      vehicles.some((vehicle) => String(vehicle.key) === selectedVehicleValue),
+    [form.vehicleId, selectedVehicleValue, vehicles],
+  )
+
+  useEffect(() => {
+    if (!existing) return
+
+    setForm((current) => {
+      if (current.vehicleId == null || current.vehicleLabel.trim().length > 0) {
+        return current
+      }
+
+      return {
+        ...current,
+        vehicleLabel: getVehicleSelectLabel(
+          current.vehicleId,
+          existing.vehicleName ?? '',
+          vehicles,
+        ),
+      }
+    })
+  }, [existing, vehicles])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -572,12 +796,22 @@ function TransportModal({
       setFormError('Please select a vehicle.')
       return
     }
-    if (!form.fromLocationId || !form.toLocationId) {
+    if (!form.fromLocationLabel.trim() || !form.toLocationLabel.trim()) {
       setFormError('Please select both from and to locations.')
       return
     }
-    if (!form.fare || Number(form.fare) <= 0) {
-      setFormError('Please enter a valid fare amount.')
+    const fareValue = form.fare.trim() === '' ? 0 : Number(form.fare)
+    if (isNaN(fareValue) || fareValue < 0) {
+      setFormError('Please enter a valid fare amount (0 or more).')
+      return
+    }
+
+    let coordinates: TransportCoordinates
+
+    try {
+      coordinates = await requestCurrentTransportCoordinates()
+    } catch (error) {
+      setFormError(getTransportLocationErrorMessage(error))
       return
     }
 
@@ -586,12 +820,15 @@ function TransportModal({
         await addTransport.mutateAsync({
           taskId,
           taskTransportationVehicleId: form.vehicleId,
-          taskTransportationCost: Number(form.fare),
-          taskTransportationStartLat: 0,
-          taskTransportationStartLong: 0,
+          vehicleName: selectedVehicleLabel || undefined,
+          taskTransportationCost: fareValue,
+          taskTransportationStartLat: coordinates.latitude,
+          taskTransportationStartLong: coordinates.longitude,
           taskTransportationEndLat: null,
           taskTransportationEndLong: null,
+          taskTransportationStartLocationId: form.fromLocationId,
           taskTransportationStartLocation: form.fromLocationLabel,
+          taskTransportationEndLocationId: form.toLocationId,
           taskTransportationEndLocation: form.toLocationLabel,
           taskTransportationRemarks: form.remarks || undefined,
         })
@@ -600,12 +837,15 @@ function TransportModal({
           taskId,
           taskTransportationAutoId: existing!.taskTransportationAutoId,
           taskTransportationVehicleId: form.vehicleId,
-          taskTransportationCost: Number(form.fare),
-          taskTransportationStartLat: 0,
-          taskTransportationStartLong: 0,
+          vehicleName: selectedVehicleLabel || undefined,
+          taskTransportationCost: fareValue,
+          taskTransportationStartLat: coordinates.latitude,
+          taskTransportationStartLong: coordinates.longitude,
           taskTransportationEndLat: null,
           taskTransportationEndLong: null,
+          taskTransportationStartLocationId: form.fromLocationId,
           taskTransportationStartLocation: form.fromLocationLabel,
+          taskTransportationEndLocationId: form.toLocationId,
           taskTransportationEndLocation: form.toLocationLabel,
           taskTransportationRemarks: form.remarks || undefined,
         })
@@ -642,21 +882,29 @@ function TransportModal({
               Vehicle <span className="text-red-500">*</span>
             </label>
             <select
-              value={form.vehicleId ?? ''}
+              value={selectedVehicleValue}
               disabled={loadingVehicles}
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
                   vehicleId: e.target.value ? Number(e.target.value) : null,
+                  vehicleLabel: e.target.options[e.target.selectedIndex]?.text ?? '',
                 }))
               }
               className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
             >
-              <option value="">
-                {loadingVehicles ? 'Loading vehicles…' : 'Select vehicle…'}
-              </option>
+              {loadingVehicles ? (
+                <option value={selectedVehicleValue}>
+                  {selectedVehicleLabel ? `${selectedVehicleLabel} (loading…)` : 'Loading vehicles…'}
+                </option>
+              ) : (
+                <option value="">Select vehicle…</option>
+              )}
+              {!loadingVehicles && form.vehicleId != null && !hasVehicleOption && (
+                <option value={selectedVehicleValue}>{selectedVehicleLabel}</option>
+              )}
               {vehicles.map((v) => (
-                <option key={v.key} value={v.key}>
+                <option key={v.key} value={String(v.key)}>
                   {v.value}
                 </option>
               ))}
@@ -742,6 +990,63 @@ function TransportModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+function DeliveryDialog({
+  dialog,
+  onClose,
+  loading,
+}: {
+  dialog: DeliveryDialogState
+  onClose: () => void
+  loading?: boolean
+}) {
+  const isConfirm = dialog.kind === 'confirm'
+
+  const handleConfirm = async () => {
+    if (dialog.kind !== 'confirm') {
+      onClose()
+      return
+    }
+    try {
+      await dialog.onConfirm()
+      onClose()
+    } catch {
+      // Keep the dialog open if the action fails.
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+        <div className="px-6 py-5">
+          <h3 className="text-base font-semibold text-gray-900">{dialog.title}</h3>
+          <p className="mt-1 text-sm text-gray-600">{dialog.message}</p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-4">
+          {isConfirm && (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleConfirm()}
+            disabled={loading}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white ${dialog.confirmCls ?? 'bg-blue-600 hover:bg-blue-700'} disabled:opacity-60`}
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {dialog.confirmLabel ?? (isConfirm ? 'Confirm' : 'OK')}
+          </button>
+        </div>
       </div>
     </div>
   )

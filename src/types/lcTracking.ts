@@ -29,6 +29,7 @@ export interface ProformaInvoice {
   piDate: string
   piCustmomerId: number                  // NOTE: backend typo "Custmomer"
   customerName: string
+  customerAddress?: string
   piAmount: number
   piCurrency: string                     // "USD" | "BDT"
   piStatus: number
@@ -38,9 +39,22 @@ export interface ProformaInvoice {
   piNote: string
   piNumberMapped: string | null
   piProductDetailsInfo: PiProductDetail[]
-  piConditions: PiConditions
+  /** Actual API returns a key→value string dict of active conditions */
+  piConditions: Record<string, string>
   piConversionRate?: number
   beneficiaryBankName?: string
+  // Extra fields present in the GET detail response
+  hsCode?: string
+  lcPaymetTerms?: string
+  bankOperatingBranch?: string
+  bankAccountNumber?: string
+  bankSwiftNumber?: string
+  // Fields returned by GetAllProformaInvoices (LC tracking report)
+  lcNumber?: string
+  lcDate?: string
+  lcLifecycleName?: string
+  lcLifecycleId?: number
+  lcAmount?: number
 }
 
 export interface PiProductDetail {
@@ -50,6 +64,14 @@ export interface PiProductDetail {
   piProductPrice: number
   piProductPriceConvertionRate: number
   piLineTotalAmount: number
+  // Optional display columns (returned in detail response)
+  productCategoryName?: string
+  functionName?: string
+  groupName?: string
+  brandName?: string
+  productLevel?: string
+  productShelfLife?: string
+  productPackSize?: string
 }
 
 export interface PiConditions {
@@ -114,6 +136,7 @@ export interface PiByStatus {
   customerAddress: string
   piAmount: number
   piCurrency: string
+  piCustmomerId?: number              // NOTE: backend typo "Custmomer"
   lcDocId?: number
   lcNumber?: string
   lcAmount?: number
@@ -127,10 +150,16 @@ export interface LcDocument {
   lcNumber: string
   lcAmount: number
   lcDate: string
-  chequeBankId: number
+  // API may return both legacy and alias fields on GET; create/update payloads should use lcIssuerBankId / lcIssuerBranchLocationId
+  lcIssuerBankId?: number
+  lcIssuerBranchLocationId?: number
+  chequeBankId?: number
   chequeBankName: string
-  locationId: number
+  issuerBankName?: string | null
+  locationId?: number
   locationName: string
+  branchLocationName?: string | null
+  issuerBranchLocationName?: string | null
   piSystemId: number
   piNumber: string
   piDate: string
@@ -165,17 +194,18 @@ export interface CreateLcPayload {
   lcNumber: string
   lcAmount: number
   lcDate: string
-  chequeBankId: number
-  locationId: number
+  lcIssuerBankId: number
+  lcIssuerBranchLocationId: number
 }
 
 export interface UpdateLcDocPayload {
   lcDocId: number
+  piSystemId: number
   docPrepDate: string | null
   docSumbitDate: string | null
   docCustomerAcceptedDate: string | null
   docBenificerySubmissionDate: string | null
-  ibcNumber: string | null
+  lcIbcNumber: string | null
   bankAcceptanceDate: string | null
   maturityDate: string | null
   revisedMaturityDate: string | null
@@ -186,8 +216,8 @@ export interface LcLimitedUpdatePayload {
   lcNumber: string
   lcAmount: number
   lcDate: string
-  chequeBankId: number
-  locationId: number
+  lcIssuerBankId: number
+  lcIssuerBranchLocationId: number
 }
 
 export interface LcEditListItem {
@@ -223,7 +253,7 @@ export interface LcPaymentEntryPayload {
   paymentNote: string
   isPaymentComplete: boolean
   lcDocId: number
-  paymentRelatedJobId: null
+  paymentRelatedJobId: number | null
   paymentChequeId: null
   paymentAdjustedAmount: null
   moenyRecepitNo: string               // NOTE: backend typo — always ""
@@ -232,6 +262,14 @@ export interface LcPaymentEntryPayload {
   chequeBeneficiaryBankId: null
   chequeStatusId: null
   chequeActionDate: null
+  // Extra read-only fields returned by GetPaymentRelatedDetailsById
+  piNumber?: string
+  lcNumber?: string
+  lcDate?: string
+  customerName?: string
+  empFirstName?: string
+  empLastName?: string
+  employeeCode?: string
 }
 
 export interface UpdateLcPaymentPayload extends LcPaymentEntryPayload {
@@ -241,8 +279,12 @@ export interface UpdateLcPaymentPayload extends LcPaymentEntryPayload {
 export interface LcPaymentSummary {
   totalPaid: number
   remainingAmount: number
+  remainingBalance: number          // same value, legacy name
   lcAmount: number
   paymentCount?: number
+  paymentPercentage?: number
+  isFullyPaid?: boolean
+  payments?: Array<{ paymentId: number; lcCollectionConversionRate?: number }>
 }
 
 export interface LcPaymentListItem {

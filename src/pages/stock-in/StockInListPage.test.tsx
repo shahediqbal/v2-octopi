@@ -144,6 +144,8 @@ describe('StockInListPage view action', () => {
     expect(screen.getByText('Vitamin C')).toBeTruthy()
     expect(screen.getByText('B-500')).toBeTruthy()
     expect(screen.getByText('Carton')).toBeTruthy()
+    expect(screen.getByText('Total Confirmed Qty')).toBeTruthy()
+    expect(screen.getByText('8.0000 KG')).toBeTruthy()
   })
 
   it('shows the full admin-approved list newest-first and filters it with client-side search', async () => {

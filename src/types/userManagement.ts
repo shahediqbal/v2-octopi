@@ -41,3 +41,9 @@ export interface CreateRolePayload {
   roleDescription?: string
   roleStatus: 1
 }
+
+export interface ChangePasswordPayload {
+  userSystemId: number
+  oldPassword: string
+  newPassword: string
+}

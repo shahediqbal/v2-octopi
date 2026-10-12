@@ -4,9 +4,15 @@ import { Link, useLocation } from 'react-router-dom'
 import { PaginatedCombobox } from '@/components/dropdowns'
 import { LIST_MODE_CONFIG, getStatusLabel } from '@/features/stock-out/modes'
 import { useDebounce } from '@/hooks/useDebounce'
-import { useStockOutDetail, useStockOutList, useBulkEscalate } from '@/hooks/useStockOut'
+import { useBulkEscalate, usePackagingDetail, useStockOutDetail, useStockOutList } from '@/hooks/useStockOut'
+import { KarjadeshView } from '@/pages/sales-orders/KarjadeshView'
+import { SalesOrderChalaanModal } from '@/pages/sales-orders/SalesOrderChalaanModal'
 import { SalesOrderInternalModal } from '@/pages/sales-orders/SalesOrderInternalModal'
+import { SalesOrderStickerModal } from '@/pages/sales-orders/SalesOrderStickerModal'
 import type { ListMode } from '@/types/stockOut'
+
+type PackageDoneModalKind = 'invoice' | 'chalaan' | 'packing' | 'sticker'
+type ActiveRowModal = { orderId: number; kind: 'view' | PackageDoneModalKind }
 
 function todayInput() {
   return new Date().toISOString().slice(0, 10)
@@ -19,6 +25,13 @@ function toCurrency(value: number | string | null | undefined) {
   }
 
   return numeric.toFixed(4)
+}
+
+function formatOrderDate(value: string | null | undefined) {
+  if (!value) return '—'
+
+  const dateOnly = value.slice(0, 10)
+  return dateOnly || '—'
 }
 
 interface SalesOrderListPageProps {
@@ -50,6 +63,7 @@ function renderRowActions(
   currentStatus: number | string | null | undefined,
   onView: (salesOrderId: number) => void,
   onEscalate?: (salesOrderId: number) => void,
+  onPackageDoneAction?: (salesOrderId: number, action: PackageDoneModalKind) => void,
 ) {
   const returnTo = getListPath(mode)
   const normalizedStatus = String(currentStatus ?? '0')
@@ -57,7 +71,9 @@ function renderRowActions(
     <button
       type="button"
       onClick={() => onView(salesOrderId)}
-      className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+      className={mode === 'package-done'
+        ? 'action-view inline-flex items-center rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100'
+        : 'action-view inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50'}
     >
       View
     </button>
@@ -69,20 +85,20 @@ function renderRowActions(
         <>
           <Link
             to={`/sales-orders/${salesOrderId}/edit`}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Edit
           </Link>
           <Link
             to={`/sales-orders/${salesOrderId}/review`}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-view inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Review
           </Link>
           <button
             type="button"
             onClick={() => onEscalate?.(salesOrderId)}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-select inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Escalate
           </button>
@@ -95,13 +111,13 @@ function renderRowActions(
           <>
             <Link
               to={`/sales-orders/${salesOrderId}/escalate`}
-              className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="action-view inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
             >
               Invoice
             </Link>
             <Link
               to={`/sales-orders/${salesOrderId}/package`}
-              className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="action-select inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
             >
               Package
             </Link>
@@ -113,7 +129,7 @@ function renderRowActions(
         <>
           <Link
             to={`/sales-orders/${salesOrderId}/escalate`}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-view inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Invoice
           </Link>
@@ -126,13 +142,13 @@ function renderRowActions(
           <>
             <Link
               to={`/sales-orders/packages/done/${salesOrderId}/edit`}
-              className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
             >
               Edit Pack
             </Link>
             <Link
               to={`/sales-orders/packing-print?orderId=${salesOrderId}`}
-              className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="action-view inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
             >
               Print
             </Link>
@@ -144,13 +160,13 @@ function renderRowActions(
         <>
           <Link
             to={`/sales-orders/${salesOrderId}/escalate`}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-view inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Invoice
           </Link>
           <Link
             to={`/sales-orders/${salesOrderId}/package`}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-select inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Package
           </Link>
@@ -160,13 +176,41 @@ function renderRowActions(
     case 'package-done':
       return (
         <>
+          {viewButton}
+          <button
+            type="button"
+            onClick={() => onPackageDoneAction?.(salesOrderId, 'invoice')}
+            className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-100"
+          >
+            Invoice
+          </button>
+          <button
+            type="button"
+            onClick={() => onPackageDoneAction?.(salesOrderId, 'chalaan')}
+            className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100"
+          >
+            Chalaan
+          </button>
+          <button
+            type="button"
+            onClick={() => onPackageDoneAction?.(salesOrderId, 'packing')}
+            className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+          >
+            Packing
+          </button>
+          <button
+            type="button"
+            onClick={() => onPackageDoneAction?.(salesOrderId, 'sticker')}
+            className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+          >
+            Sticker
+          </button>
           <Link
             to={`/sales-orders/packing-print?orderId=${salesOrderId}`}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-view inline-flex items-center rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700 transition-colors hover:bg-cyan-100"
           >
             Print
           </Link>
-          {viewButton}
         </>
       )
     case 'admin-general':
@@ -175,49 +219,35 @@ function renderRowActions(
           <Link
             to={`/sales-orders/admin/${salesOrderId}/edit`}
             state={{ returnTo }}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Sales
           </Link>
           <Link
             to={`/sales-orders/admin/${salesOrderId}/price-edit`}
             state={{ returnTo }}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Invoice
           </Link>
-          {normalizedStatus === '3' && (
-            <Link
-              to={`/sales-orders/admin/packages/done/${salesOrderId}/edit`}
-              state={{ returnTo }}
-              className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            >
-              Package
-            </Link>
-          )}
-          {normalizedStatus === '3' && (
-            <Link
-              to={`/sales-orders/packing-print?orderId=${salesOrderId}`}
-              className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            >
-              Print
-            </Link>
-          )}
-          {viewButton}
+          <Link
+            to={`/sales-orders/admin/packages/done/${salesOrderId}/edit`}
+            state={{ returnTo }}
+            className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            Package
+          </Link>
         </>
       )
     case 'admin-pending-price':
       return (
-        <>
-          <Link
-            to={`/sales-orders/admin/${salesOrderId}/price-edit`}
-            state={{ returnTo }}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
-          >
-            Invoice
-          </Link>
-          {viewButton}
-        </>
+        <Link
+          to={`/sales-orders/admin/${salesOrderId}/price-edit`}
+          state={{ returnTo }}
+          className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          Invoice
+        </Link>
       )
     case 'admin-limited-edit':
       return (
@@ -225,7 +255,7 @@ function renderRowActions(
           <Link
             to={`/sales-orders/admin/${salesOrderId}/invoice-edit`}
             state={{ returnTo }}
-            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Invoice
           </Link>
@@ -244,6 +274,7 @@ function getInitialStatus(mode: ListMode) {
     case 'packaging':
       return '2'
     case 'package-done':
+    case 'admin-general':
       return '3'
     default:
       return '0'
@@ -270,15 +301,47 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
   const [customerId, setCustomerId] = useState<number | null>(null)
   const [startDate, setStartDate] = useState(getInitialDate(mode))
   const [endDate, setEndDate] = useState(getInitialDate(mode))
-  const [viewOrderId, setViewOrderId] = useState<number | null>(null)
+  const [activeModal, setActiveModal] = useState<ActiveRowModal | null>(null)
   const debouncedSearch = useDebounce(search, 300)
+  const requiresSearch = mode === 'admin-general'
+  const [hasSearched, setHasSearched] = useState(!requiresSearch)
   const { data, isLoading, isError, error } = useStockOutList(mode, {
     status,
     startDate,
     endDate,
     customerId,
-  })
-  const { data: viewDetail, isLoading: loadingView, error: viewError } = useStockOutDetail(viewOrderId ?? undefined)
+  }, hasSearched)
+  const activeModalKind = activeModal?.kind ?? null
+  const activeOrderId = activeModal?.orderId ?? undefined
+  const needsPackagingDetail = activeModalKind === 'chalaan' || activeModalKind === 'sticker'
+  const { data: modalOrderDetail, isLoading: loadingModalOrder, error: modalOrderError } = useStockOutDetail(activeOrderId)
+  const { data: packagingDetail, isLoading: loadingPackagingDetail, error: packagingDetailError } = usePackagingDetail(
+    needsPackagingDetail ? activeOrderId : undefined,
+  )
+  const activeListRow = useMemo(
+    () => (data ?? []).find((row) => row.soSystemId === activeOrderId),
+    [activeOrderId, data],
+  )
+  const resolvedModalOrderDetail = useMemo(() => {
+    if (!modalOrderDetail) return modalOrderDetail
+
+    const general = modalOrderDetail.stockOutGeneralData
+    const preferText = (
+      primary: string | null | undefined,
+      fallback: string | null | undefined,
+    ) => primary?.trim() || fallback?.trim() || null
+
+    return {
+      ...modalOrderDetail,
+      stockOutGeneralData: {
+        ...general,
+        customerName: preferText(general.customerName, activeListRow?.customerName),
+        customerAddress: preferText(general.customerAddress, activeListRow?.customerAddress),
+        supplierName: preferText(general.supplierName, activeListRow?.supplierName),
+        supplierAddress: preferText(general.supplierAddress, activeListRow?.supplierAddress),
+      },
+    }
+  }, [activeListRow, modalOrderDetail])
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [confirmEscalateId, setConfirmEscalateId] = useState<number | null>(null)
@@ -295,14 +358,18 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
     setCustomerId(null)
     setStartDate(getInitialDate(mode))
     setEndDate(getInitialDate(mode))
-    setViewOrderId(null)
+    setActiveModal(null)
     setSelectedIds(new Set())
     setConfirmEscalateId(null)
+    setHasSearched(mode !== 'admin-general')
   }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
   const showCheckboxes = mode === 'standard' && status === '0'
 
   const showCreateAction = mode === 'standard'
   const showActionColumn = true
+  const showStatusColumn = mode !== 'admin-general' && mode !== 'admin-pending-price'
+  const showFinalBillColumn = mode !== 'admin-general' && mode !== 'admin-pending-price' && mode !== 'package-done'
+  const showOrderFromColumn = mode === 'admin-pending-price'
 
   const toggleSelection = useCallback((id: number) => {
     setSelectedIds((prev) => {
@@ -322,6 +389,18 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
 
   const handleRowEscalate = useCallback((id: number) => {
     setConfirmEscalateId(id)
+  }, [])
+
+  const handleViewOrder = useCallback((id: number) => {
+    setActiveModal({ orderId: id, kind: 'view' })
+  }, [])
+
+  const handlePackageDoneAction = useCallback((id: number, kind: PackageDoneModalKind) => {
+    setActiveModal({ orderId: id, kind })
+  }, [])
+
+  const closeActiveModal = useCallback(() => {
+    setActiveModal(null)
   }, [])
 
   const handleConfirmEscalate = useCallback(async () => {
@@ -385,13 +464,13 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
                 type="button"
                 onClick={handleBulkEscalate}
                 disabled={bulkEscalate.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-600 disabled:opacity-50"
+                className="action-select inline-flex items-center gap-2 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-600 disabled:opacity-50"
               >
                 {bulkEscalate.isPending && <Loader2 size={16} className="animate-spin" />}
                 Escalate Selected ({selectedIds.size})
               </button>
             )}
-            <Link to="/sales-orders/create" className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700">
+            <Link to="/sales-orders/create" className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700">
               <Plus size={16} /> Create Sales Order
             </Link>
           </div>
@@ -399,16 +478,18 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
       </div>
 
       <div className="grid grid-cols-1 gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_16rem_12rem_12rem]">
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search order no, customer, supplier, type..."
-            className="h-10 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
-          />
-        </div>
+        {!requiresSearch && (
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search order no, customer, supplier, type..."
+              className="h-10 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+            />
+          </div>
+        )}
 
         <PaginatedCombobox type="customer" value={customerId} onValueChange={setCustomerId} placeholder="Filter customer..." />
 
@@ -425,6 +506,17 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
           onChange={(event) => setEndDate(event.target.value)}
           className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
         />
+
+        {requiresSearch && (
+          <button
+            type="button"
+            onClick={() => setHasSearched(true)}
+            className="action-report inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-gray-800 px-4 text-sm font-semibold text-white transition-colors hover:bg-gray-700 lg:col-span-1"
+          >
+            <Search size={15} />
+            Search
+          </button>
+        )}
       </div>
 
       {config.tabs.length > 0 && (
@@ -478,19 +570,20 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
                     </th>
                   )}
                   <th className="px-5 py-3">Order No</th>
-                  <th className="px-5 py-3">Order Date</th>
+                  <th className={mode === 'package-done' ? 'px-4 py-3' : 'px-5 py-3'}>Order Date</th>
                   <th className="px-5 py-3">Partner</th>
-                  <th className="px-5 py-3">Address</th>
-                  <th className="px-5 py-3">Type</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3 text-right">Final Bill</th>
-                  {showActionColumn && <th className="px-5 py-3 text-center">Action</th>}
+                  <th className={mode === 'package-done' ? 'px-3 py-3' : 'px-5 py-3'}>Address</th>
+                  <th className={mode === 'package-done' ? 'px-3 py-3' : 'px-5 py-3'}>Type</th>
+                  {showOrderFromColumn && <th className="px-5 py-3">Order From</th>}
+                  {showStatusColumn && <th className={mode === 'package-done' ? 'px-3 py-3' : 'px-5 py-3'}>Status</th>}
+                  {showFinalBillColumn && <th className="px-5 py-3 text-right">Final Bill</th>}
+                  {showActionColumn && <th className={mode === 'package-done' ? 'px-3 py-3 text-center' : 'px-5 py-3 text-center'}>Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={(showActionColumn ? 8 : 7) + (showCheckboxes ? 1 : 0)} className="px-5 py-12 text-center text-gray-400">
+                    <td colSpan={5 + (showStatusColumn ? 1 : 0) + (showFinalBillColumn ? 1 : 0) + (showOrderFromColumn ? 1 : 0) + (showActionColumn ? 1 : 0) + (showCheckboxes ? 1 : 0)} className="px-5 py-12 text-center text-gray-400">
                       {debouncedSearch || customerId || startDate || endDate ? 'No matching sales orders found.' : 'No sales orders available for this status.'}
                     </td>
                   </tr>
@@ -508,20 +601,42 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
                         </td>
                       )}
                       <td className="px-5 py-3 font-medium text-gray-900">{row.soSystemNo ?? row.soSystemId}</td>
-                      <td className="px-5 py-3 text-gray-700">{row.invoiceDate ?? '—'}</td>
+                      <td className={mode === 'package-done' ? 'px-4 py-3 whitespace-nowrap text-gray-700' : 'px-5 py-3 text-gray-700'}>
+                        {formatOrderDate(row.invoiceDate)}
+                      </td>
                       <td className="px-5 py-3 text-gray-700">{row.customerName ?? row.supplierName ?? '—'}</td>
-                      <td className="px-5 py-3 text-gray-600">{row.customerAddress ?? row.supplierAddress ?? '—'}</td>
-                      <td className="px-5 py-3 text-gray-700">{row.jobType ?? row.jobTypeName ?? '—'}</td>
-                      <td className="px-5 py-3">
-                        <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
-                          {row.currentStatusName ?? getStatusLabel(row.soCurrentStatus ?? row.currentStatus)}
+                      <td className={mode === 'package-done' ? 'px-3 py-3 text-gray-600' : 'px-5 py-3 text-gray-600'}>
+                        <span className={mode === 'package-done' ? 'block max-w-[10rem] whitespace-normal break-words text-xs leading-5' : undefined}>
+                          {row.customerAddress ?? row.supplierAddress ?? '—'}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right text-gray-700">{toCurrency(row.finalBill ?? row.calculatedBill)}</td>
+                      <td className={mode === 'package-done' ? 'px-3 py-3 text-xs text-gray-700' : 'px-5 py-3 text-gray-700'}>
+                        <span className={mode === 'package-done' ? 'block max-w-[6.5rem] break-words leading-5' : undefined}>
+                          {row.jobType ?? row.jobTypeName ?? '—'}
+                        </span>
+                      </td>
+                      {showOrderFromColumn && <td className="px-5 py-3 text-gray-700">{row.soOrderFrom ?? '—'}</td>}
+                      {showStatusColumn && (
+                        <td className={mode === 'package-done' ? 'px-3 py-3' : 'px-5 py-3'}>
+                          <span className={mode === 'package-done'
+                            ? 'inline-flex max-w-[6.5rem] rounded-full bg-gray-100 px-2 py-1 text-[11px] font-semibold leading-4 text-gray-700'
+                            : 'inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700'}>
+                            {row.currentStatusName ?? getStatusLabel(row.soCurrentStatus ?? row.currentStatus)}
+                          </span>
+                        </td>
+                      )}
+                      {showFinalBillColumn && <td className="px-5 py-3 text-right text-gray-700">{toCurrency(row.finalBill ?? row.calculatedBill)}</td>}
                       {showActionColumn && (
-                        <td className="px-5 py-3">
-                          <div className="flex items-center justify-center gap-2">
-                            {renderRowActions(mode, row.soSystemId, row.soCurrentStatus ?? row.currentStatus, setViewOrderId, handleRowEscalate)}
+                        <td className={mode === 'package-done' ? 'px-3 py-3' : 'px-5 py-3'}>
+                          <div className={mode === 'package-done' ? 'flex flex-wrap items-center justify-center gap-1.5' : 'flex items-center justify-center gap-2'}>
+                            {renderRowActions(
+                              mode,
+                              row.soSystemId,
+                              row.soCurrentStatus ?? row.currentStatus,
+                              handleViewOrder,
+                              handleRowEscalate,
+                              handlePackageDoneAction,
+                            )}
                           </div>
                         </td>
                       )}
@@ -535,11 +650,48 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
       )}
 
       <SalesOrderInternalModal
-        isOpen={viewOrderId !== null}
-        detail={viewDetail}
-        isLoading={loadingView}
-        errorMessage={(viewError as Error | undefined)?.message}
-        onClose={() => setViewOrderId(null)}
+        isOpen={activeModalKind === 'view'}
+        detail={resolvedModalOrderDetail}
+        isLoading={loadingModalOrder}
+        errorMessage={(modalOrderError as Error | undefined)?.message}
+        showItemMetadata={mode === 'packaging' || mode === 'package-done'}
+        onClose={closeActiveModal}
+      />
+
+      <SalesOrderInternalModal
+        isOpen={activeModalKind === 'invoice'}
+        detail={resolvedModalOrderDetail}
+        isLoading={loadingModalOrder}
+        errorMessage={(modalOrderError as Error | undefined)?.message}
+        title="Invoice / Detail"
+        viewVariant="packing-print"
+        onClose={closeActiveModal}
+      />
+
+      <KarjadeshView
+        isOpen={activeModalKind === 'packing'}
+        detail={resolvedModalOrderDetail}
+        isLoading={loadingModalOrder}
+        errorMessage={(modalOrderError as Error | undefined)?.message}
+        onClose={closeActiveModal}
+      />
+
+      <SalesOrderChalaanModal
+        isOpen={activeModalKind === 'chalaan'}
+        packagingDetail={packagingDetail}
+        orderDetail={resolvedModalOrderDetail}
+        isLoading={loadingModalOrder || loadingPackagingDetail}
+        errorMessage={(packagingDetailError as Error | undefined)?.message ?? (modalOrderError as Error | undefined)?.message}
+        onClose={closeActiveModal}
+      />
+
+      <SalesOrderStickerModal
+        isOpen={activeModalKind === 'sticker'}
+        packagingDetail={packagingDetail}
+        orderDetail={resolvedModalOrderDetail}
+        isLoading={loadingModalOrder || loadingPackagingDetail}
+        errorMessage={(packagingDetailError as Error | undefined)?.message ?? (modalOrderError as Error | undefined)?.message}
+        onClose={closeActiveModal}
       />
 
       {confirmEscalateId !== null && (
@@ -562,7 +714,7 @@ export function SalesOrderListPage({ mode = 'standard' }: SalesOrderListPageProp
                 type="button"
                 onClick={handleConfirmEscalate}
                 disabled={bulkEscalate.isPending}
-                className="inline-flex items-center gap-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-600 disabled:opacity-50"
+                className="action-select inline-flex items-center gap-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-600 disabled:opacity-50"
               >
                 {bulkEscalate.isPending && <Loader2 size={14} className="animate-spin" />}
                 Escalate

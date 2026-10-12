@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { AlertCircle, Database, FileSpreadsheet, Loader2, PackagePlus, RefreshCw, Search } from 'lucide-react'
-import { useStockAdjustmentReport, useAdjustmentReferences } from '@/hooks/useStockAdjustmentReport'
+import { PaginatedCombobox } from '@/components/dropdowns/PaginatedCombobox'
+import { useStockAdjustmentReport } from '@/hooks/useStockAdjustmentReport'
 import { exportExcelOnDemand } from '@/utils/lazyExportExcel'
 
 function fmtQty(value: number | null) {
@@ -16,11 +17,10 @@ const EXCEL_COLUMNS = [
 ] as const
 
 export function StockAdjustmentReportPage() {
-  const [referenceId, setReferenceId] = useState<number | null>(null)
+  const [productId, setProductId] = useState<number | null>(null)
+  const [productLabel, setProductLabel] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [loadRequested, setLoadRequested] = useState(false)
-
-  const { data: references = [], isLoading: refsLoading } = useAdjustmentReferences()
 
   const {
     data: reportData = [],
@@ -28,7 +28,7 @@ export function StockAdjustmentReportPage() {
     isError,
     error,
     refetch,
-  } = useStockAdjustmentReport(referenceId ?? 0, loadRequested && !!referenceId)
+  } = useStockAdjustmentReport(productId ?? 0, loadRequested)
 
   const filteredData = useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
@@ -45,37 +45,31 @@ export function StockAdjustmentReportPage() {
     [reportData],
   )
 
-  const selectedRef = useMemo(
-    () => references.find((r) => r.id === referenceId),
-    [references, referenceId],
-  )
-
   const handleLoad = useCallback(() => {
-    if (!referenceId) return
     setLoadRequested(true)
     void refetch()
-  }, [referenceId, refetch])
+  }, [refetch])
 
   const handleExport = useCallback(async () => {
     if (filteredData.length === 0) return
     await exportExcelOnDemand({
-      fileName: `Stock_Adjustment_${selectedRef?.label ?? referenceId}`,
+      fileName: `Stock_Adjustment_${productLabel ?? 'All_Products'}`,
       title: 'Stock Adjustment Report',
-      subtitle: `Reference: ${selectedRef?.label ?? '-'}`,
+      subtitle: `Product: ${productLabel ?? 'All Products'}`,
       sheetName: 'Stock Adjustment',
       columns: [...EXCEL_COLUMNS],
       data: filteredData.map((item) => ({
         ...item,
         sadIsIncreased: item.sadIsIncreased ? 'Yes' : 'No',
       })) as unknown as Record<string, unknown>[],
-      filters: [['Reference', selectedRef?.label || '-']],
+      filters: [['Product', productLabel || 'All Products']],
       summaryCards: [
         ['Total Records', reportData.length],
         ['Total Increase', fmtQty(totalIncrease)],
         ['Total Decrease', fmtQty(totalDecrease)],
       ],
     })
-  }, [filteredData, selectedRef, referenceId, reportData.length, totalIncrease, totalDecrease])
+  }, [filteredData, productLabel, reportData.length, totalIncrease, totalDecrease])
 
   const noData = reportData.length === 0
 
@@ -83,24 +77,27 @@ export function StockAdjustmentReportPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Stock Adjustment Report</h1>
-        <p className="mt-1 text-sm text-gray-500">View stock adjustment details by reference.</p>
+        <p className="mt-1 text-sm text-gray-500">View stock adjustment details for all products or a selected product.</p>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-end gap-3 border-b border-gray-100 px-4 py-4">
           <div className="min-w-[240px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-gray-600">Adjustment Reference <span className="text-red-500">*</span></label>
-            <select
-              value={referenceId ?? ''}
-              onChange={(e) => { setReferenceId(e.target.value ? Number(e.target.value) : null); setLoadRequested(false) }}
-              disabled={refsLoading}
-              className={inputCls}
-            >
-              <option value="">— Select Reference —</option>
-              {references.map((r) => (
-                <option key={r.id} value={r.id}>{r.label}</option>
-              ))}
-            </select>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Product</label>
+            <PaginatedCombobox
+              type="product"
+              value={productId}
+              onValueChange={(value) => {
+                setProductId(value)
+                setLoadRequested(false)
+              }}
+              onLabelChange={(label) => {
+                setProductLabel(label)
+              }}
+              selectedLabel={productLabel}
+              placeholder="Search product or leave blank for all..."
+            />
+            <p className="mt-1 text-xs text-gray-500">Leave blank to load all stock adjustment records.</p>
           </div>
           <div className="min-w-[160px]">
             <label className="mb-1 block text-xs font-medium text-gray-600">Search</label>
@@ -119,8 +116,8 @@ export function StockAdjustmentReportPage() {
             {noData ? (
               <button
                 onClick={handleLoad}
-                disabled={isLoading || !referenceId}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isLoading}
+                className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading && <Loader2 size={14} className="animate-spin" />}
                 {isLoading ? 'Loading…' : 'Load Data'}
@@ -130,14 +127,14 @@ export function StockAdjustmentReportPage() {
                 <button
                   onClick={handleExport}
                   disabled={filteredData.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <FileSpreadsheet size={14} />Excel
                 </button>
                 <button
                   onClick={handleLoad}
-                  disabled={isLoading || !referenceId}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  disabled={isLoading}
+                  className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />Refresh
                 </button>
@@ -153,14 +150,14 @@ export function StockAdjustmentReportPage() {
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400"><PackagePlus size={28} /></div>
             <h2 className="text-lg font-semibold text-gray-900">No Data Loaded</h2>
-            <p className="mt-1 max-w-sm text-sm text-gray-500">Select an adjustment reference and click Load Data.</p>
+            <p className="mt-1 max-w-sm text-sm text-gray-500">Click Load Data to fetch all records, or pick a product first to filter the result.</p>
           </div>
         )}
         {!isLoading && loadRequested && noData && !isError && (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400"><Database size={28} /></div>
             <h2 className="text-lg font-semibold text-gray-900">No Records Found</h2>
-            <p className="mt-1 max-w-sm text-sm text-gray-500">No adjustment records found for this reference.</p>
+            <p className="mt-1 max-w-sm text-sm text-gray-500">No adjustment records found for the selected filter.</p>
           </div>
         )}
 

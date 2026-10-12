@@ -12,7 +12,9 @@ import { getAccessToken } from '@/auth/authBridge'
 import { createStockOutSchema, type StockOutFormValues } from '@/schemas/stockOutSchema'
 import { SalesOrderItemTable } from '@/pages/sales-orders/SalesOrderItemTable'
 import { PaymentInfo } from '@/pages/sales-orders/PaymentInfo'
+import { getSubmitToneClass } from '@/lib/actionButtonStyles'
 import type { EditMode } from '@/types/stockOut'
+import { useCustomerDetail } from '@/hooks/useCustomers'
 
 interface SalesOrderFormProps {
   defaultValues?: Partial<StockOutFormValues>
@@ -21,6 +23,7 @@ interface SalesOrderFormProps {
   submitLabel: string
   serverError?: string
   mode?: EditMode
+  headerLabels?: { customerName?: string | null; supplierName?: string | null }
 }
 
 const inputCls =
@@ -51,7 +54,7 @@ function getChannelIdFromToken(): number {
   }
 }
 
-export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLabel, serverError, mode = 'standard' }: SalesOrderFormProps) {
+export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLabel, serverError, mode = 'standard', headerLabels }: SalesOrderFormProps) {
   const {
     register,
     handleSubmit,
@@ -87,6 +90,14 @@ export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLa
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
   const formValues = useWatch({ control }) as StockOutFormValues
   const itemValues = formValues.items ?? []
+  const totalQuantity = useMemo(
+  () =>
+    itemValues.reduce(
+      (sum, item) => sum + parseNumeric(item.quantity),
+      0,
+    ),
+  [itemValues],
+)
   const isCreateMode = defaultValues == null
   const customerRule = getStockOutFieldRule(mode, 'soCustomerId')
   const supplierRule = getStockOutFieldRule(mode, 'soSupplierId')
@@ -115,8 +126,13 @@ export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLa
     conversionRule,
   ].some((rule) => rule !== 'hidden')
   const lockHeaderSelections = isCreateMode && mode === 'standard' && itemValues.length > 0
+  const canEditCustomer = customerRule === 'editable' && !lockHeaderSelections
   const [previewProductId, setPreviewProductId] = useState<number | null>(null)
+const selectedCustomerId = formValues.soCustomerId ?? undefined
 
+const { data: selectedCustomer } = useCustomerDetail(
+  selectedCustomerId && selectedCustomerId > 0 ? selectedCustomerId : undefined
+)
   useEffect(() => {
     if (!defaultValues) return
 
@@ -261,29 +277,43 @@ export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLa
             {/* Row 1: Order Type | Order From */}
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Order Type *" error={errors.soJobTypeId?.message}>
-                <select
-                  {...register('soJobTypeId', { setValueAs: (value) => (value === '' ? null : Number(value)) })}
-                  className={inputCls}
-                  disabled={loadingLookups || jobTypeRule !== 'editable' || lockHeaderSelections}
-                >
-                  <option value="">Select order type</option>
-                  {lookups?.orderTypes.map((option) => (
-                    <option key={option.id} value={option.id}>{option.label}</option>
-                  ))}
-                </select>
+                <Controller
+                  name="soJobTypeId"
+                  control={control}
+                  render={({ field }) => (
+                    <select
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      className={inputCls}
+                      disabled={loadingLookups || jobTypeRule !== 'editable' || lockHeaderSelections}
+                    >
+                      <option value="">Select order type</option>
+                      {lookups?.orderTypes.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                    </select>
+                  )}
+                />
               </Field>
 
               <Field label="Order From *" error={errors.soOrderFromId?.message}>
-                <select
-                  {...register('soOrderFromId', { setValueAs: (value) => (value === '' ? null : Number(value)) })}
-                  className={inputCls}
-                  disabled={loadingLookups || orderFromRule !== 'editable' || lockHeaderSelections}
-                >
-                  <option value="">Select source</option>
-                  {lookups?.orderSources.map((option) => (
-                    <option key={option.id} value={option.id}>{option.label}</option>
-                  ))}
-                </select>
+                <Controller
+                  name="soOrderFromId"
+                  control={control}
+                  render={({ field }) => (
+                    <select
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      className={inputCls}
+                      disabled={loadingLookups || orderFromRule !== 'editable' || lockHeaderSelections}
+                    >
+                      <option value="">Select source</option>
+                      {lookups?.orderSources.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                      ))}
+                    </select>
+                  )}
+                />
               </Field>
             </div>
 
@@ -300,13 +330,26 @@ export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLa
                         value={field.value}
                         onValueChange={field.onChange}
                         placeholder="Search customer..."
+                        selectedLabel={headerLabels?.customerName}
                         hasError={!!fieldState.error}
-                        disabled={customerRule !== 'editable' || lockHeaderSelections}
+                        //disabled={customerRule !== 'editable' || lockHeaderSelections}
+                      disabled={!canEditCustomer}
                       />
                     )}
                   />
                 </Field>
               )}
+              {!isPurchaseReturn && (
+  <Field label="Customer Address">
+    <textarea
+      value={selectedCustomer?.customerAddress ?? ''}
+      className={inputCls}
+      rows={2}
+      placeholder="Customer address will appear here"
+      readOnly
+    />
+  </Field>
+)}
               {isPurchaseReturn && (
                 <Field label="Supplier *" error={errors.soSupplierId?.message}>
                   <Controller
@@ -318,6 +361,7 @@ export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLa
                         value={field.value}
                         onValueChange={field.onChange}
                         placeholder="Search supplier..."
+                        selectedLabel={headerLabels?.supplierName}
                         hasError={!!fieldState.error}
                         disabled={supplierRule !== 'editable' || lockHeaderSelections}
                       />
@@ -400,6 +444,7 @@ export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLa
               mode={mode}
               hidePricingColumns={isSampleIssue || isWarehouseTransfer}
               register={register}
+              control={control}
               fields={fields}
               errors={errors}
               onRemove={remove}
@@ -426,7 +471,7 @@ export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLa
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`${getSubmitToneClass(submitLabel)} inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                 {submitLabel}
@@ -554,6 +599,12 @@ export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLa
                 {/* Totals Summary */}
                 <div className="mt-2 space-y-1.5 border-t border-gray-200 pt-3 text-sm text-gray-700">
                   <div className="flex justify-between">
+                    <span className="font-medium">Total Quantity:</span>
+                    <span className="font-semibold text-gray-900">
+                      {totalQuantity.toFixed(4)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="font-medium">Subtotal:</span>
                     <span>{formValues.sobCurrencyName} {billSummary.subtotal}</span>
                   </div>
@@ -598,7 +649,7 @@ export function SalesOrderForm({ defaultValues, onSubmit, isSubmitting, submitLa
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`${getSubmitToneClass(submitLabel)} w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                 {submitLabel}
@@ -802,7 +853,7 @@ function StandardProductPicker({
         <button
           type="button"
           onClick={handleAdd}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
+          className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
         >
           Add Item
         </button>
@@ -963,7 +1014,7 @@ function WarehouseTransferPicker({ append, existingProductIds }: WarehouseTransf
       <button
         type="button"
         onClick={handleAdd}
-        className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
+        className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
       >
         Add Item
       </button>
@@ -1120,7 +1171,7 @@ function SampleByCategoryTabs({ append, existingProductIds }: SampleByCategoryTa
           <button
             type="button"
             onClick={handleAddByProduct}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
+            className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
           >
             Add Item
           </button>

@@ -52,7 +52,7 @@ export function TaxDutyListPage() {
           <button
             type="button"
             onClick={() => navigate('/tax-duty/add')}
-            className="flex items-center gap-1.5 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            className="action-insert flex items-center gap-1.5 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
             <Plus size={15} />
             Add Tax &amp; Duty

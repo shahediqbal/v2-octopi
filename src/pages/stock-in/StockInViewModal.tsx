@@ -15,6 +15,12 @@ function formatAmount(value: number | null | undefined) {
   return value != null ? value.toFixed(4) : '—'
 }
 
+function getTotalConfirmedQuantity(
+  items: Array<{ sidConfirmedQty?: number | null }> | null | undefined,
+) {
+  return (items ?? []).reduce((sum, item) => sum + Number(item.sidConfirmedQty ?? 0), 0)
+}
+
 function getBatchSummary(
   batches: Array<{ batchNo?: string | null; batchNumber?: string | null }> | null | undefined,
 ) {
@@ -25,6 +31,19 @@ function getBatchSummary(
   return values.length > 0 ? values.join(', ') : 'No Batches'
 }
 
+// function getPackSummary(
+//   packs: Array<{
+//     packTypeName?: string | null
+//     sipPackSize?: string | null
+//     packDetails?: string | null
+//   }> | null | undefined,
+// ) {
+//   const values = (packs ?? [])
+//     .map((pack) => pack.packTypeName ?? pack.sipPackSize ?? pack.packDetails ?? null)
+//     .filter((value): value is string => Boolean(value?.trim()))
+
+//   return values.length > 0 ? values.join(', ') : 'No Maps'
+// }
 function getPackSummary(
   packs: Array<{
     packTypeName?: string | null
@@ -36,9 +55,29 @@ function getPackSummary(
     .map((pack) => pack.packTypeName ?? pack.sipPackSize ?? pack.packDetails ?? null)
     .filter((value): value is string => Boolean(value?.trim()))
 
-  return values.length > 0 ? values.join(', ') : 'No Maps'
+  return values.length > 0 ? values.join(', ') : 'No Packs'
 }
 
+function getMapSummary(item: {
+  mappedProductName?: string | null
+  sidMappedProductName?: string | null
+  sidMappedProductId?: number | null
+}) {
+  const mappedProductName =
+    item.mappedProductName?.trim() ||
+    item.sidMappedProductName?.trim() ||
+    null
+
+  if (mappedProductName) {
+    return mappedProductName
+  }
+
+  if (item.sidMappedProductId) {
+    return `Mapped Product #${item.sidMappedProductId}`
+  }
+
+  return 'No Maps'
+}
 function extractErrorMessage(error: unknown) {
   if (
     error &&
@@ -85,6 +124,7 @@ export function StockInViewModal({ stockInId, onClose }: StockInViewModalProps) 
   const general = detail?.stockInGeneralData
   const bill = detail?.stockInBillData
   const partnerName = general?.supplierName ?? general?.customerName ?? '—'
+  const totalConfirmedQty = getTotalConfirmedQuantity(detail?.stockInItemsData)
 
   return (
     <div
@@ -183,13 +223,14 @@ export function StockInViewModal({ stockInId, onClose }: StockInViewModalProps) 
                         <th className="px-4 py-3 text-right">Confirmed Price</th>
                         <th className="px-4 py-3">Strength</th>
                         <th className="px-4 py-3">Batches</th>
+                        <th className="px-4 py-3">Pack Type</th>
                         <th className="px-4 py-3">Maps</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {detail.stockInItemsData.length === 0 && (
                         <tr>
-                          <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">
+                         <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">
                             No items found.
                           </td>
                         </tr>
@@ -209,7 +250,9 @@ export function StockInViewModal({ stockInId, onClose }: StockInViewModalProps) 
                           </td>
                           <td className="px-4 py-3 text-gray-700">{item.sidProductStrength ?? '—'}</td>
                           <td className="px-4 py-3 text-gray-700">{getBatchSummary(item.sidBatches)}</td>
-                          <td className="px-4 py-3 text-gray-700">{getPackSummary(item.sidPacks)}</td>
+<td className="px-4 py-3 text-gray-700">
+  {getPackSummary(item.sidPacks)}
+</td>                 <td className="px-4 py-3 text-gray-700">{getMapSummary(item)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -219,7 +262,7 @@ export function StockInViewModal({ stockInId, onClose }: StockInViewModalProps) 
 
               <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500">Bill Summary</h3>
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
                   <div>
                     <p className="text-xs uppercase tracking-wider text-gray-500">Subtotal</p>
                     <p className="mt-1 text-sm font-medium text-gray-900">{formatAmount(bill?.sibCalculatedAmount)}</p>
@@ -235,6 +278,10 @@ export function StockInViewModal({ stockInId, onClose }: StockInViewModalProps) 
                   <div>
                     <p className="text-xs uppercase tracking-wider text-gray-500">Final Total</p>
                     <p className="mt-1 text-sm font-semibold text-gray-900">{formatAmount(bill?.sibFinalAmount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-gray-500">Total Confirmed Qty</p>
+                    <p className="mt-1 text-sm font-semibold text-green-700">{formatAmount(totalConfirmedQty)} KG</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wider text-gray-500">Currency</p>

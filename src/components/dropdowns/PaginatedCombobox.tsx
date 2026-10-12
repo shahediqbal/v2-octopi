@@ -5,7 +5,8 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { DROPDOWN_REGISTRY } from '@/types/dropdown'
 import type { DropdownType } from '@/types/dropdown'
 import { cn } from '@/lib/utils'
-import { ChevronsUpDown, Check, Loader2, Search, X, AlertCircle, RefreshCw } from 'lucide-react'
+import { AlertCircle, Check, ChevronsUpDown, Copy, Loader2, RefreshCw, Search, X } from 'lucide-react'
+import { copyTextToClipboard } from './dropdownUtils'
 
 interface PaginatedComboboxProps {
   /** Which dropdown type to load (customer, product, location, employee) */
@@ -67,6 +68,7 @@ export function PaginatedCombobox({
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedOption, setSelectedOption] = useState<{ key: number; value: string } | null>(null)
+  const [copied, setCopied] = useState(false)
   const [panelPosition, setPanelPosition] = useState<{ top: number; left: number; width: number } | null>(null)
   const debouncedSearch = useDebounce(search, 300)
 
@@ -75,6 +77,7 @@ export function PaginatedCombobox({
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const selectedItemRef = useRef<HTMLDivElement | null>(null)
+  const copyResetTimerRef = useRef<number | null>(null)
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, refetch } =
     usePaginatedDropdown(type, debouncedSearch, config.pageSize ?? 50)
@@ -85,7 +88,7 @@ export function PaginatedCombobox({
   )
   const resolvedSelectedLabel =
     value == null
-      ? null
+      ? (selectedLabel ?? null)
       : options.find((option) => option.key === value)?.value
         ?? selectedLabel
         ?? (selectedOption?.key === value ? selectedOption.value : null)
@@ -158,6 +161,14 @@ export function PaginatedCombobox({
     return () => window.cancelAnimationFrame(frameId)
   }, [open, options, value])
 
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current != null) {
+        window.clearTimeout(copyResetTimerRef.current)
+      }
+    }
+  }, [])
+
   // Close on Escape
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -187,11 +198,11 @@ export function PaginatedCombobox({
 
   function handleSelect(key: number) {
     const matchedOption = options.find((option) => option.key === key) ?? null
-    if (matchedOption) {
-      setSelectedOption(matchedOption)
-      onLabelChange?.(matchedOption.value)
-    }
-    onValueChange(key === value ? null : key)
+    const nextValue = key === value ? null : key
+
+    setSelectedOption(nextValue == null ? null : matchedOption)
+    onLabelChange?.(nextValue == null ? null : matchedOption?.value ?? null)
+    onValueChange(nextValue)
     closeDropdown()
   }
 
@@ -201,6 +212,20 @@ export function PaginatedCombobox({
     onValueChange(null)
     onLabelChange?.(null)
     setSearch('')
+  }
+
+  async function handleCopySelected(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!resolvedSelectedLabel) return
+
+    const wasCopied = await copyTextToClipboard(resolvedSelectedLabel)
+    if (!wasCopied) return
+
+    setCopied(true)
+    if (copyResetTimerRef.current != null) {
+      window.clearTimeout(copyResetTimerRef.current)
+    }
+    copyResetTimerRef.current = window.setTimeout(() => setCopied(false), 1500)
   }
 
   return (
@@ -239,6 +264,23 @@ export function PaginatedCombobox({
           {resolvedSelectedLabel ?? placeholderText}
         </span>
         <div className="flex items-center gap-1">
+          {resolvedSelectedLabel && (
+            <span
+              role="button"
+              tabIndex={0}
+              title={copied ? 'Copied' : 'Copy selected option'}
+              onClick={handleCopySelected}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  void handleCopySelected(event as unknown as React.MouseEvent)
+                }
+              }}
+              className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            >
+              <Copy className={cn('h-3.5 w-3.5', copied && 'text-emerald-600')} />
+            </span>
+          )}
           {value != null && !disabled && (
             <X
               className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600"

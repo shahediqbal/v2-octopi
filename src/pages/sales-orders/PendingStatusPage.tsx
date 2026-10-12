@@ -34,6 +34,8 @@ export function PendingStatusPage() {
   const [search, setSearch] = useState('')
   const [selectedRow, setSelectedRow] = useState<StockOutListRow | null>(null)
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null)
+  const [sortCol, setSortCol] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const {
     data: rows = [],
@@ -48,23 +50,51 @@ export function PendingStatusPage() {
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return rows
+    let result = !query
+      ? rows
+      : rows.filter((row) =>
+          [
+            row.soSystemNo,
+            row.customerName,
+            row.customerAddress,
+            row.soSystemPending,
+            row.soDecesionPending,
+            row.actionTakenRemarks,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(query),
+        )
 
-    return rows.filter((row) =>
-      [
-        row.soSystemNo,
-        row.customerName,
-        row.customerAddress,
-        row.soSystemPending,
-        row.soDecesionPending,
-        row.actionTakenRemarks,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-    )
-  }, [rows, search])
+    if (sortCol) {
+      result = [...result].sort((a, b) => {
+        const aVal = (a as Record<string, unknown>)[sortCol] ?? ''
+        const bVal = (b as Record<string, unknown>)[sortCol] ?? ''
+        const cmp =
+          typeof aVal === 'number' && typeof bVal === 'number'
+            ? aVal - bVal
+            : String(aVal).localeCompare(String(bVal))
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    }
+
+    return result
+  }, [rows, search, sortCol, sortDir])
+
+  const handleSort = (col: string) => {
+    setSortCol((prev) => {
+      if (prev === col) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+        return col
+      }
+      setSortDir('asc')
+      return col
+    })
+  }
+
+  const sortIndicator = (col: string) =>
+    sortCol === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
 
   const handleExport = async () => {
     if (filteredRows.length === 0) return
@@ -133,7 +163,7 @@ export function PendingStatusPage() {
           <button
             type="button"
             onClick={() => refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+            className="action-report inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
           >
             <RefreshCw size={16} /> Refresh
           </button>
@@ -141,7 +171,7 @@ export function PendingStatusPage() {
             type="button"
             onClick={handleExport}
             disabled={filteredRows.length === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FileSpreadsheet size={16} /> Excel
           </button>
@@ -172,14 +202,14 @@ export function PendingStatusPage() {
               <thead>
                 <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
                   <th className="px-5 py-3">Action</th>
-                  <th className="px-5 py-3">Invoice No</th>
-                  <th className="px-5 py-3">Invoice Date</th>
-                  <th className="px-5 py-3">Customer</th>
-                  <th className="px-5 py-3">Address</th>
-                  <th className="px-5 py-3">Invoice Value</th>
-                  <th className="px-5 py-3">Sales Type</th>
-                  <th className="px-5 py-3">Work Pending</th>
-                  <th className="px-5 py-3">Decision Pending</th>
+                  <th className="cursor-pointer select-none px-5 py-3 hover:text-gray-600" onClick={() => handleSort('soSystemNo')}>Invoice No{sortIndicator('soSystemNo')}</th>
+                  <th className="cursor-pointer select-none px-5 py-3 hover:text-gray-600" onClick={() => handleSort('invoiceDate')}>Invoice Date{sortIndicator('invoiceDate')}</th>
+                  <th className="cursor-pointer select-none px-5 py-3 hover:text-gray-600" onClick={() => handleSort('customerName')}>Customer{sortIndicator('customerName')}</th>
+                  <th className="cursor-pointer select-none px-5 py-3 hover:text-gray-600" onClick={() => handleSort('customerAddress')}>Address{sortIndicator('customerAddress')}</th>
+                  <th className="cursor-pointer select-none px-5 py-3 hover:text-gray-600" onClick={() => handleSort('sobFinalBill')}>Invoice Value{sortIndicator('sobFinalBill')}</th>
+                  <th className="cursor-pointer select-none px-5 py-3 hover:text-gray-600" onClick={() => handleSort('jobType')}>Sales Type{sortIndicator('jobType')}</th>
+                  <th className="cursor-pointer select-none px-5 py-3 hover:text-gray-600" onClick={() => handleSort('soSystemPending')}>Work Pending{sortIndicator('soSystemPending')}</th>
+                  <th className="cursor-pointer select-none px-5 py-3 hover:text-gray-600" onClick={() => handleSort('soDecesionPending')}>Decision Pending{sortIndicator('soDecesionPending')}</th>
                   <th className="px-5 py-3">Remarks</th>
                 </tr>
               </thead>
@@ -198,7 +228,7 @@ export function PendingStatusPage() {
                             setSelectedRow(row)
                             setSelectedRowId(row.soSystemId)
                           }}
-                          className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                          className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                         >
                           Update
                         </button>

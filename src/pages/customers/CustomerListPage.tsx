@@ -53,7 +53,7 @@ export function CustomerListPage() {
         </div>
         <Link
           to="/customers/add"
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
+          className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
         >
           <Plus size={16} /> Add Customer
         </Link>
@@ -104,13 +104,14 @@ export function CustomerListPage() {
                   <th className="px-5 py-3">Address</th>
                   <th className="px-5 py-3">Channel</th>
                   <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3 text-right">Dispute Amount</th>
                   <th className="px-5 py-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {customers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-10 text-center text-gray-400">
+                    <td colSpan={9} className="px-5 py-10 text-center text-gray-400">
                       {search ? 'No matching customers found.' : 'No customers yet.'}
                     </td>
                   </tr>
@@ -132,10 +133,16 @@ export function CustomerListPage() {
                       <td className="px-5 py-3">
                         <StatusBadge status={c.currentStatus} />
                       </td>
+                      <td className="px-5 py-3 text-right tabular-nums text-gray-700">
+                        {(c.disputeAmount ?? 0).toLocaleString('en-BD', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
                       <td className="px-5 py-3 text-center">
                         <Link
                           to={`/customers/${c.customerId}/edit`}
-                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                          className="action-update inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                         >
                           <Pencil size={12} /> Edit
                         </Link>

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, ArrowLeft, Eye, Loader2 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useLatestStockOutBatchMap, useStockOutBatches, useStockOutDetail, useSubmitPackaging } from '@/hooks/useStockOut'
+import { SearchableSelect } from '@/components/dropdowns'
+//import { useLatestStockOutBatchMap, useStockOutBatches, useStockOutDetail, useSubmitPackaging } from '@/hooks/useStockOut'
+import { useLastThreeStockOutBatchMap, useStockOutBatches, useStockOutDetail, useSubmitPackaging } from '@/hooks/useStockOut'
 import { extractApiResponseErrorMessage } from '@/pages/sales-orders/stockOutMappers'
 import type { StockOutItemData, StockOutLookupOption } from '@/types/stockOut'
 
@@ -67,54 +69,176 @@ interface LastBatchMapViewProps {
   onClose: () => void
 }
 
+// function LastBatchMapView({ customerId, productId, onClose }: LastBatchMapViewProps) {
+//   const { data, isLoading } = useLatestStockOutBatchMap(customerId, productId)
+//   return (
+//     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+//       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
+//         <h4 className="text-sm font-semibold text-gray-900">Last Batch &amp; Map</h4>
+//         {isLoading && (
+//           <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
+//             <Loader2 size={14} className="animate-spin" /> Loading…
+//           </div>
+//         )}
+//         {!isLoading && data && (
+//           <dl className="mt-3 space-y-2 text-sm">
+//             <div className="flex justify-between">
+//               <dt className="text-gray-500">Batch No</dt>
+//               <dd className="font-medium text-gray-900">{data.batchNo ?? '—'}</dd>
+//             </div>
+//             <div className="flex justify-between gap-3">
+//               <dt className="text-gray-500">Max Invoice Date</dt>
+//               <dd className="text-right font-medium text-gray-900">{formatBatchMapDate(data.maxInvoiceDate)}</dd>
+//             </div>
+//             <div className="flex justify-between">
+//               <dt className="text-gray-500">Mapped Product</dt>
+//               <dd className="font-medium text-gray-900">{data.mappedProductName ?? '—'}</dd>
+//             </div>
+//             <div className="flex justify-between gap-3">
+//               <dt className="text-gray-500">Invoice Date</dt>
+//               <dd className="text-right font-medium text-gray-900">{formatBatchMapDate(data.invoiceDate)}</dd>
+//             </div>
+//           </dl>
+//         )}
+//         {!isLoading && !data && (
+//           <p className="mt-3 text-sm text-gray-500">No previous batch/map data found.</p>
+//         )}
+//         <div className="mt-5 flex justify-end">
+//           <button
+//             type="button"
+//             onClick={onClose}
+//             className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+//           >
+//             Close
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   )
+// }
 function LastBatchMapView({ customerId, productId, onClose }: LastBatchMapViewProps) {
-  const { data, isLoading } = useLatestStockOutBatchMap(customerId, productId)
+  const { data, isLoading } = useLastThreeStockOutBatchMap(customerId, productId)
+
+  const lastBatches = data?.lastBatches ?? []
+  const lastMapProducts = data?.lastMapProducts ?? []
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
-        <h4 className="text-sm font-semibold text-gray-900">Last Batch &amp; Map</h4>
-        {isLoading && (
-          <div className="mt-3 flex items-center gap-2 text-sm text-gray-500">
-            <Loader2 size={14} className="animate-spin" /> Loading…
+      <div className="w-full max-w-3xl rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900">
+              Previous Batch &amp; Mapping
+            </h4>
+            <p className="mt-1 text-xs text-gray-500">
+              Showing previous batch and mapped product history separately for this customer and product.
+            </p>
           </div>
-        )}
-        {!isLoading && data && (
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-gray-500">Batch No</dt>
-              <dd className="font-medium text-gray-900">{data.batchNo ?? '—'}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-gray-500">Max Invoice Date</dt>
-              <dd className="text-right font-medium text-gray-900">{formatBatchMapDate(data.maxInvoiceDate)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-gray-500">Mapped Product</dt>
-              <dd className="font-medium text-gray-900">{data.mappedProductName ?? '—'}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-gray-500">Invoice Date</dt>
-              <dd className="text-right font-medium text-gray-900">{formatBatchMapDate(data.invoiceDate)}</dd>
-            </div>
-          </dl>
-        )}
-        {!isLoading && !data && (
-          <p className="mt-3 text-sm text-gray-500">No previous batch/map data found.</p>
-        )}
-        <div className="mt-5 flex justify-end">
+
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Close
           </button>
         </div>
+
+        {isLoading && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+            <Loader2 size={14} className="animate-spin" /> Loading…
+          </div>
+        )}
+
+        {!isLoading && (
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-gray-100">
+              <div className="border-b border-gray-100 bg-gray-50 px-3 py-2">
+                <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Previous 3 Batches
+                </h5>
+              </div>
+
+              {lastBatches.length === 0 ? (
+                <p className="px-3 py-3 text-sm text-gray-500">
+                  No previous batch found.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                        <th className="px-3 py-2">Batch</th>
+                        <th className="px-3 py-2">Invoice Date</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {lastBatches.map((item, index) => (
+                        <tr
+                          key={`${item.batchNo ?? 'batch'}-${index}`}
+                          className="border-b border-gray-100 last:border-0"
+                        >
+                          <td className="px-3 py-2 font-medium text-gray-900">
+                            {item.batchNo ?? '—'}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {formatBatchMapDate(item.maxInvoiceDate)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-gray-100">
+              <div className="border-b border-gray-100 bg-gray-50 px-3 py-2">
+                <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Previous 3 Mapped Products
+                </h5>
+              </div>
+
+              {lastMapProducts.length === 0 ? (
+                <p className="px-3 py-3 text-sm text-gray-500">
+                  No previous mapped product found.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+                        <th className="px-3 py-2">Mapped Product</th>
+                        <th className="px-3 py-2">Invoice Date</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {lastMapProducts.map((item, index) => (
+                        <tr
+                          key={`${item.sodMappedProductId ?? 'map'}-${item.invoiceDate ?? index}`}
+                          className="border-b border-gray-100 last:border-0"
+                        >
+                          <td className="px-3 py-2 font-medium text-gray-900">
+                            {item.mapProduct ?? '—'}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {formatBatchMapDate(item.invoiceDate)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
-
 // ─── single item row ────────────────────────────────────────────────────────
 
 interface ItemRowProps {
@@ -130,8 +254,41 @@ function EscalateItemRow({ row, customerId, onChange }: ItemRowProps) {
 
   const batches: StockOutLookupOption[] = batchLookup?.finalBatch ?? []
   const mappedItems: StockOutLookupOption[] = batchLookup?.finalMappedItem ?? []
+  const batchOptions = batches.map((batch) => ({ key: batch.id, value: batch.label }))
+  const mappedItemOptions = mappedItems.map((item) => ({ key: item.id, value: item.label }))
+  const selectedBatchIds = row.selectedBatchIds.filter(
+    (batchId, index, current) => batchId > 0 && current.indexOf(batchId) === index,
+  )
+  const addableBatchOptions = batchOptions.filter((option) => !selectedBatchIds.includes(option.key))
 
   const lineTotal = Number(row.quantity) * Number(row.unitPrice)
+
+  const handleBatchSelectionChange = (batchIndex: number, selectedValue: number | null) => {
+    if (selectedValue == null) {
+      onChange({
+        ...row,
+        selectedBatchIds: selectedBatchIds.filter((_, index) => index !== batchIndex),
+      })
+      return
+    }
+
+    const nextBatchIds = [...selectedBatchIds]
+    nextBatchIds[batchIndex] = selectedValue
+
+    onChange({
+      ...row,
+      selectedBatchIds: nextBatchIds.filter((batchId, index, current) => current.indexOf(batchId) === index),
+    })
+  }
+
+  const handleAddBatchSelection = (selectedValue: number | null) => {
+    if (selectedValue == null) return
+
+    onChange({
+      ...row,
+      selectedBatchIds: [...selectedBatchIds, selectedValue],
+    })
+  }
 
   return (
     <tr className="border-b border-gray-100 hover:bg-gray-50/60">
@@ -149,8 +306,20 @@ function EscalateItemRow({ row, customerId, onChange }: ItemRowProps) {
         />
       </td>
 
-      {/* Unit price — read-only */}
-      <td className="px-4 py-3 text-right text-sm text-gray-700">{Number(row.unitPrice).toFixed(4)}</td>
+      {/* Unit price — editable */}
+      <td className="px-4 py-3">
+        <input
+          type="number"
+          min={0}
+          step={0.0001}
+          value={row.unitPrice}
+          onChange={(e) => {
+            const newPrice = parseFloat(e.target.value) || 0
+            onChange({ ...row, unitPrice: newPrice, sodFinalCalculatedUnitPrice: newPrice })
+          }}
+          className="w-24 rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-800 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+        />
+      </td>
 
       {/* Line total — read-only */}
       <td className="px-4 py-3 text-right text-sm text-gray-700">{lineTotal.toFixed(4)}</td>
@@ -179,19 +348,41 @@ function EscalateItemRow({ row, customerId, onChange }: ItemRowProps) {
         {loadingBatch ? (
           <Loader2 size={14} className="animate-spin text-gray-400" />
         ) : (
-          <select
-            value={row.selectedBatchIds[0] ?? ''}
-            onChange={(e) => {
-              const val = e.target.value === '' ? [] : [Number(e.target.value)]
-              onChange({ ...row, selectedBatchIds: val })
-            }}
-            className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-800 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
-          >
-            <option value="">— Select Batch —</option>
-            {batches.map((b) => (
-              <option key={b.id} value={b.id}>{b.label}</option>
-            ))}
-          </select>
+          <div className="space-y-2">
+            {selectedBatchIds.map((batchId, batchIndex) => {
+              const otherSelectedIds = selectedBatchIds.filter((_, index) => index !== batchIndex)
+              const slotOptions = batchOptions.filter(
+                (option) => option.key === batchId || !otherSelectedIds.includes(option.key),
+              )
+
+              return (
+                <SearchableSelect
+                  key={`${row.sodProductId}-batch-${batchId}-${batchIndex}`}
+                  options={slotOptions}
+                  value={batchId}
+                  onValueChange={(selectedValue) => handleBatchSelectionChange(batchIndex, selectedValue)}
+                  placeholder="Select Batch..."
+                  ariaLabel={`${row.productName} batch ${batchIndex + 1}`}
+                  className="w-full"
+                  emptyMessage="No batch options found"
+                />
+              )
+            })}
+
+            <SearchableSelect
+              options={addableBatchOptions}
+              value={null}
+              onValueChange={handleAddBatchSelection}
+              placeholder={selectedBatchIds.length === 0 ? 'Select Batch...' : 'Add another batch...'}
+              ariaLabel={`${row.productName} add batch`}
+              className="w-full"
+              emptyMessage="No batch options found"
+            />
+
+            {selectedBatchIds.length > 1 && (
+              <p className="text-xs text-gray-500">{selectedBatchIds.length} batches selected</p>
+            )}
+          </div>
         )}
       </td>
 
@@ -209,18 +400,19 @@ function EscalateItemRow({ row, customerId, onChange }: ItemRowProps) {
             className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
           />
           {showMappedProduct && (
-            <select
-              value={row.sodMappedProductId ?? ''}
-              onChange={(e) =>
-                onChange({ ...row, sodMappedProductId: e.target.value === '' ? null : Number(e.target.value) })
-              }
-              className="w-44 rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-800 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
-            >
-              <option value="">— Map product —</option>
-              {mappedItems.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
-            </select>
+            <div className="w-44">
+              <SearchableSelect
+                options={mappedItemOptions}
+                value={row.sodMappedProductId}
+                onValueChange={(selectedValue) =>
+                  onChange({ ...row, sodMappedProductId: selectedValue })
+                }
+                placeholder="Map product..."
+                ariaLabel={`${row.productName} mapped product`}
+                className="w-full"
+                emptyMessage="No mapped products found"
+              />
+            </div>
           )}
         </div>
       </td>
@@ -249,6 +441,30 @@ export function EscalateOrderPage() {
   const updateRow = (productId: number, updated: EscalateRowState) => {
     setRows((prev) => prev.map((r) => (r.sodProductId === productId ? updated : r)))
   }
+
+  // Recompute bill from current row state so price edits are reflected in summary & payload
+  const billData = detail?.stockOutBillData
+  const computedSubtotal = rows.reduce((sum, r) => sum + r.quantity * r.unitPrice, 0)
+  const computedTotalQuantity = rows.reduce(
+  (sum, row) => sum + Number(row.quantity || 0),
+  0,
+)
+  const computedBillDiscountAmount =
+    billData?.billDiscountType === 'P'
+      ? computedSubtotal * (Number(billData?.billDiscountRate ?? 0) / 100)
+      : Number(billData?.billDiscountRate ?? 0)
+  const computedVatAmount = computedSubtotal * (Number(billData?.billVatPercantage ?? 0) / 100)
+  const computedAitAmount = computedSubtotal * (Number(billData?.billAitPercantage ?? 0) / 100)
+  const computedFinalBill =
+    computedSubtotal +
+    computedVatAmount +
+    computedAitAmount -
+    computedBillDiscountAmount +
+    Number(billData?.billAdjustmentAmount ?? 0)
+  const computedConvertedBill =
+    billData?.sobCurrencyName === 'USD' && billData?.sobCurrencyConversionRate
+      ? computedFinalBill * Number(billData.sobCurrencyConversionRate)
+      : computedFinalBill
 
   const handleSubmit = async () => {
     setServerError('')
@@ -297,18 +513,18 @@ export function EscalateOrderPage() {
         itemRemark: r.itemRemark ?? 'sdw',
       })),
       stockOutBillData: {
-        calculatedBill: bill.calculatedBill,
+        calculatedBill: computedSubtotal,
         billDiscountType: bill.billDiscountType,
         billDiscountRate: bill.billDiscountRate,
-        billDiscountAmount: bill.billDiscountAmount,
+        billDiscountAmount: computedBillDiscountAmount,
         billDiscountNote: 'steering',
         billVatPercantage: bill.billVatPercantage,
         billAitPercantage: bill.billAitPercantage,
         billAdjustmentAmount: bill.billAdjustmentAmount,
-        finalBill: bill.finalBill,
+        finalBill: computedFinalBill,
         sobCurrencyName: bill.sobCurrencyName ?? 'BDT',
         sobCurrencyConversionRate: bill.sobCurrencyConversionRate ?? 1,
-        sobFinalConvertedBill: bill.sobFinalConvertedBill ?? bill.finalBill,
+        sobFinalConvertedBill: computedConvertedBill,
       },
     }
 
@@ -416,7 +632,7 @@ export function EscalateOrderPage() {
                 <th className="px-4 py-3 text-right">Unit Price</th>
                 <th className="px-4 py-3 text-right">Line Total</th>
                 <th className="px-4 py-3 text-center">Last B&amp;M</th>
-                <th className="px-4 py-3">Batch</th>
+                <th className="px-4 py-3">Batches</th>
                 <th className="px-4 py-3">Mapped Product</th>
               </tr>
             </thead>
@@ -434,30 +650,36 @@ export function EscalateOrderPage() {
         </div>
       </div>
 
-      {/* Financial summary — read-only */}
+      {/* Financial summary — recomputed from row state */}
       <div className="flex justify-end">
         <div className="w-full max-w-xs space-y-2 rounded-xl border border-gray-200 bg-white p-4 shadow-sm text-sm">
           <div className="flex justify-between">
+            <span className="text-gray-500">Total Quantity</span>
+            <span className="font-medium text-gray-900">
+              {computedTotalQuantity.toFixed(4)}
+            </span>
+          </div>
+          <div className="flex justify-between">
             <span className="text-gray-500">Subtotal</span>
-            <span className="font-medium text-gray-900">{currency} {Number(bill.calculatedBill).toFixed(2)}</span>
+            <span className="font-medium text-gray-900">{currency} {computedSubtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">VAT ({bill.billVatPercantage}%)</span>
             <span className="text-gray-700">
-              {currency} {(Number(bill.calculatedBill) * (Number(bill.billVatPercantage) / 100)).toFixed(2)}
+              {currency} {computedVatAmount.toFixed(2)}
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">AIT ({bill.billAitPercantage}%)</span>
             <span className="text-gray-700">
-              {currency} {(Number(bill.calculatedBill) * (Number(bill.billAitPercantage) / 100)).toFixed(2)}
+              {currency} {computedAitAmount.toFixed(2)}
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">
               Discount{bill.billDiscountType === 'P' ? ` (${bill.billDiscountRate}%)` : ''}
             </span>
-            <span className="text-gray-700">{currency} {Number(bill.billDiscountAmount).toFixed(2)}</span>
+            <span className="text-gray-700">{currency} {computedBillDiscountAmount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Adjustment</span>
@@ -465,7 +687,7 @@ export function EscalateOrderPage() {
           </div>
           <div className="flex justify-between border-t border-gray-100 pt-2">
             <span className="font-semibold text-gray-900">Total</span>
-            <span className="font-semibold text-gray-900">{currency} {Number(bill.finalBill).toFixed(2)}</span>
+            <span className="font-semibold text-gray-900">{currency} {computedFinalBill.toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -484,7 +706,7 @@ export function EscalateOrderPage() {
           type="button"
           onClick={handleSubmit}
           disabled={submitMutation.isPending}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-50"
+          className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-50"
         >
           {submitMutation.isPending && <Loader2 size={15} className="animate-spin" />}
           {submitMutation.isPending ? 'Saving…' : 'Save'}

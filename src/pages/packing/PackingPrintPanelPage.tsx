@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
   AlertCircle,
-  Database,
   Eye,
   FileText,
   Loader2,
@@ -24,10 +23,6 @@ function todayStr() {
   const d = new Date()
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
 }
-function firstDayOfMonth() {
-  const d = new Date()
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), '01'].join('-')
-}
 function fmtDate(v: string | null) {
   if (!v) return '-'
   const d = new Date(v)
@@ -38,17 +33,16 @@ function fmtDate(v: string | null) {
 type ModalKind = 'view' | 'sticker' | 'packing' | 'karjadesh' | null
 
 export function PackingPrintPanelPage() {
-  const [fromDate, setFromDate] = useState(firstDayOfMonth)
+  const [fromDate, setFromDate] = useState(todayStr)
   const [toDate, setToDate] = useState(todayStr)
   const [customerId, setCustomerId] = useState<number | null>(null)
   const [search, setSearch] = useState('')
-  const [loadRequested, setLoadRequested] = useState(false)
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [activeModal, setActiveModal] = useState<ModalKind>(null)
 
   const filters: PackingPrintFilters = useMemo(
-    () => ({ currentStatus: 4, startDate: fromDate, endDate: toDate, customerId: customerId ?? 0 }),
+    () => ({ currentStatus: 3, startDate: fromDate, endDate: toDate, customerId: customerId ?? 0 }),
     [fromDate, toDate, customerId],
   )
 
@@ -64,7 +58,7 @@ export function PackingPrintPanelPage() {
     isError,
     error,
     refetch,
-  } = usePackingPrintGrid(filters, loadRequested)
+  } = usePackingPrintGrid(filters, true)
 
   /* Load detail data only when a modal is open */
   const detailEnabled = selectedId != null
@@ -88,9 +82,8 @@ export function PackingPrintPanelPage() {
 
   const handleLoad = useCallback(() => {
     if (dateError) return
-    if (loadRequested) void refetch()
-    else setLoadRequested(true)
-  }, [dateError, loadRequested, refetch])
+    void refetch()
+  }, [dateError, refetch])
 
   const openModal = (id: number, kind: ModalKind) => {
     setSelectedId(id)
@@ -131,7 +124,7 @@ export function PackingPrintPanelPage() {
             <input
               type="date"
               value={fromDate}
-              onChange={(e) => { setFromDate(e.target.value); setLoadRequested(false) }}
+              onChange={(e) => { setFromDate(e.target.value) }}
               className={inputCls}
             />
           </div>
@@ -140,7 +133,7 @@ export function PackingPrintPanelPage() {
             <input
               type="date"
               value={toDate}
-              onChange={(e) => { setToDate(e.target.value); setLoadRequested(false) }}
+              onChange={(e) => { setToDate(e.target.value) }}
               className={inputCls}
             />
           </div>
@@ -149,7 +142,7 @@ export function PackingPrintPanelPage() {
             <PaginatedCombobox
               type="customer"
               value={customerId}
-              onChange={(id) => { setCustomerId(id); setLoadRequested(false) }}
+              onValueChange={(id) => { setCustomerId(id) }}
               placeholder="All Customers"
             />
           </div>
@@ -157,26 +150,24 @@ export function PackingPrintPanelPage() {
             type="button"
             onClick={handleLoad}
             disabled={!!dateError}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
           >
-            {isLoading ? <Loader2 size={15} className="animate-spin" /> : <Database size={15} />}
-            {loadRequested ? 'Refresh' : 'Load Data'}
+            {isLoading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+            Search
           </button>
-          {loadRequested && (
-            <button
-              type="button"
-              onClick={() => { setLoadRequested(false); setFromDate(firstDayOfMonth()); setToDate(todayStr()); setCustomerId(null) }}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              <RefreshCw size={15} /> Reset
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => { setFromDate(todayStr()); setToDate(todayStr()); setCustomerId(null); setSearch('') }}
+            className="action-report inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            <RefreshCw size={15} /> Reset
+          </button>
         </div>
         {dateError && <p className="mt-2 text-xs text-red-600">{dateError}</p>}
       </div>
 
       {/* ── Error ── */}
-      {loadRequested && isError && (
+      {isError && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle size={16} />
           {(error as Error)?.message ?? 'Failed to load data.'}
@@ -184,7 +175,7 @@ export function PackingPrintPanelPage() {
       )}
 
       {/* ── Loading ── */}
-      {loadRequested && isLoading && (
+      {isLoading && (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-gray-400" />
           <span className="ml-3 text-sm text-gray-500">Loading orders…</span>
@@ -192,7 +183,7 @@ export function PackingPrintPanelPage() {
       )}
 
       {/* ── Results ── */}
-      {loadRequested && !isLoading && !isError && (
+      {!isLoading && !isError && (
         <div className="space-y-3">
           {/* Search + count */}
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -269,14 +260,6 @@ export function PackingPrintPanelPage() {
               </table>
             )}
           </div>
-        </div>
-      )}
-
-      {/* ── Empty state ── */}
-      {!loadRequested && (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-16 text-center">
-          <Printer size={32} className="text-gray-300" />
-          <p className="mt-3 text-sm font-medium text-gray-500">Set filters and click Load Data</p>
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { KarjadeshView } from '@/pages/sales-orders/KarjadeshView'
 import { SalesOrderChalaanModal } from '@/pages/sales-orders/SalesOrderChalaanModal'
@@ -181,7 +181,7 @@ describe('Print surface modals', () => {
   })
 
   it('prints the chalaan surface when packaging detail is loaded', () => {
-    render(
+    const { container } = render(
       <SalesOrderChalaanModal
         isOpen
         packagingDetail={packagingDetail}
@@ -190,8 +190,46 @@ describe('Print surface modals', () => {
       />,
     )
 
-    expect(screen.getByText('TRADE ZENTRUM CHALAAN')).toBeTruthy()
-    expect(screen.getByText('Mapped Widget A')).toBeTruthy()
+    expect(screen.getByText('TRADE ZENTRUM')).toBeTruthy()
+    expect(screen.getByText('CHALLAN')).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'SL' })).toBeTruthy()
+    expect(screen.getByText('Widget A')).toBeTruthy()
+    const challanNote = screen.getByText('Note: Please report any product quality or quantity issues within 72 hours; otherwise, it will be treated as your acceptance in this regard.')
+    const challanFooterText = screen.getByText('This is a computer-generated document. No signature is required.')
+    const firstSerialCell = container.querySelector('tbody tr td.ch-cell-sl')
+
+    expect(challanNote).toBeTruthy()
+    expect(challanFooterText).toBeTruthy()
+    expect(firstSerialCell?.textContent).toBe('1')
+    expect(challanNote.closest('.ch-print-bottom')).toBe(challanFooterText.closest('.ch-print-bottom'))
+
+    const styleNode = container.querySelector('.ch style')
+    const printBottom = container.querySelector('.ch-print-bottom')
+
+    expect(printBottom?.firstElementChild).toBe(challanNote.closest('.ch-note'))
+    expect(printBottom?.lastElementChild).toBe(challanFooterText.closest('.ch-footer'))
+    expect(styleNode?.textContent).toContain('padding: 16px 8px;')
+    expect(styleNode?.textContent).toContain('.ch-table { width: 100%; border-collapse: collapse; border: none; margin-bottom: 0; table-layout: fixed; }')
+    expect(styleNode?.textContent).toContain('.ch-table th { border: none; padding: 8px 6px; font-size: 13px; text-align: center; vertical-align: middle; white-space: normal;')
+    expect(styleNode?.textContent).toContain('.ch-cell-sl { width: 5%; white-space: nowrap; }')
+    expect(styleNode?.textContent).toContain('.ch-cell-product { width: 33%; overflow-wrap: anywhere; word-break: break-word; }')
+    expect(styleNode?.textContent).toContain('.ch-cell-pack-size { width: 10%; }')
+    expect(styleNode?.textContent).toContain('.ch-cell-no-pack { width: 10%; }')
+    expect(styleNode?.textContent).toContain('.ch-total { width: 100%; border-collapse: collapse; border: none; margin-top: 32px; }')
+    expect(styleNode?.textContent).toContain('.ch-footer { text-align: center; font-size: 12px; color: #555; padding: 8px 0; border-top: none; margin-top: 0; }')
+    expect(styleNode?.textContent).toContain('.ch-received-line--spaced { padding: 4px 0 16px; }')
+    expect(styleNode?.textContent).toContain('.ch-print-bottom { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }')
+    expect(styleNode?.textContent).toContain('@page { size: A4 portrait; margin: 12mm 10mm 14mm; }')
+    expect(styleNode?.textContent).toContain('.ch { min-height: 271mm; display: flex; flex-direction: column; }')
+    expect(styleNode?.textContent).toContain('.ch-body { padding: 16px 18px 18px; display: flex; flex: 1; flex-direction: column; }')
+    expect(styleNode?.textContent).toContain('.ch-received-title { height: auto; min-height: 88px; }')
+    expect(styleNode?.textContent).toContain('position: static;')
+    expect(styleNode?.textContent).toContain('margin-top: auto;')
+    expect(styleNode?.textContent).toContain('page-break-inside: avoid;')
+
+    const totalRow = screen.getByText('Total Quantity (KG)').closest('tr')
+    expect(totalRow).toBeTruthy()
+    expect(within(totalRow as HTMLTableRowElement).getAllByRole('cell')).toHaveLength(2)
 
     fireEvent.click(screen.getByRole('button', { name: 'Print / Save PDF' }))
 
@@ -228,7 +266,7 @@ describe('Print surface modals', () => {
   })
 
   it('prints the sticker surface when packaging detail is loaded', () => {
-    render(
+    const { container } = render(
       <SalesOrderStickerModal
         isOpen
         packagingDetail={packagingDetail}
@@ -237,8 +275,12 @@ describe('Print surface modals', () => {
       />,
     )
 
-    expect(screen.getAllByText('TRADE ZENTRUM').length).toBeGreaterThan(0)
-    expect(screen.getByText('Stock-Out Package Sticker')).toBeTruthy()
+    expect(screen.getByAltText('Trade Zentrum')).toBeTruthy()
+    expect(screen.getByText('Product Stickers')).toBeTruthy()
+
+  const styleNode = container.querySelector('.so-stickers style')
+  expect(styleNode?.textContent).toContain('.so-sticker__info-row--lot {')
+  expect(styleNode?.textContent).toContain('margin-bottom: 12px;')
 
     fireEvent.click(screen.getByRole('button', { name: 'Print / Save PDF' }))
 

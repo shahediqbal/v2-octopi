@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Loader2, AlertCircle, Pencil, Layers } from 'lucide-react'
 import { useBatchList, useBatchDetail, useUpdateBatch } from '@/hooks/useBatches'
 import { useToastStore } from '@/stores/toastStore'
+import type { BatchRow } from '@/types/batch'
 
 const STATUS_OPTIONS = [
   { value: '1', label: 'Active Batches' },
@@ -13,6 +14,14 @@ const BATCH_STATUS_LABELS: Record<string, string> = {
   '1': 'Active',
   '2': 'Inactive',
   '3': 'Paused',
+}
+
+function normalizeSearchValue(value: string | null | undefined) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function formatDate(iso: string) {
@@ -40,6 +49,22 @@ function toInputDate(iso: string) {
   } catch {
     return ''
   }
+}
+
+function buildBatchSearchText(batch: BatchRow) {
+  return normalizeSearchValue(
+    [
+      batch.batchNo,
+      batch.productName,
+      formatDate(batch.batchProductionDate),
+      formatDate(batch.batchExpiryDate),
+      batch.batchProductionDate,
+      batch.batchExpiryDate,
+      BATCH_STATUS_LABELS[String(batch.batchCurrentStatus)] ?? '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
 }
 
 // ─── Edit Batch Modal ───────────────────────────────────────────────────────
@@ -183,19 +208,26 @@ function EditBatchModal({ batchId, onClose }: EditBatchModalProps) {
 // ─── Batch List Page ────────────────────────────────────────────────────────
 
 export function BatchListPage() {
-  const [statusFilter, setStatusFilter] = useState('1')
+  const [statusFilter, setStatusFilter] = useState('')
   const [search, setSearch] = useState('')
   const [editId, setEditId] = useState<number | null>(null)
 
-  const { data: batches = [], isLoading, isError } = useBatchList(statusFilter)
+  const hasSelection = statusFilter !== ''
+  const { data: batches = [], isLoading, isError } = useBatchList(statusFilter || '1', { enabled: hasSelection })
 
-  const filtered = search.trim()
-    ? batches.filter(
-        (b) =>
-          b.batchNo.toLowerCase().includes(search.toLowerCase()) ||
-          b.productName.toLowerCase().includes(search.toLowerCase()),
-      )
-    : batches
+  // Pre-compute search text for each row once when data loads (not on every keystroke).
+  const searchTexts = useMemo(() => batches.map(buildBatchSearchText), [batches])
+
+  const normalizedSearch = normalizeSearchValue(search)
+  const searchTerms = useMemo(() => (normalizedSearch ? normalizedSearch.split(' ') : []), [normalizedSearch])
+
+  const filtered = useMemo(() => {
+    if (searchTerms.length === 0) return batches
+    return batches.filter((_, i) => {
+      const searchText = searchTexts[i] ?? ''
+      return searchTerms.every((term) => searchText.includes(term))
+    })
+  }, [batches, searchTerms, searchTexts])
 
   return (
     <div className="space-y-6">
@@ -213,9 +245,10 @@ export function BatchListPage() {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); setSearch('') }}
             className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
           >
+            <option value="">— Select Status —</option>
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -224,10 +257,11 @@ export function BatchListPage() {
           </select>
           <input
             type="text"
-            placeholder="Search batch no / product…"
+            placeholder="Search batch, product, date, status..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
+            disabled={!hasSelection}
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           />
         </div>
       </div>
@@ -247,11 +281,15 @@ export function BatchListPage() {
           </div>
         )}
 
-        {!isLoading && !isError && filtered.length === 0 && (
+        {!hasSelection && (
+          <div className="py-16 text-center text-sm text-gray-400">Select a status above to load batches.</div>
+        )}
+
+        {hasSelection && !isLoading && !isError && filtered.length === 0 && (
           <div className="py-16 text-center text-sm text-gray-400">No batches found.</div>
         )}
 
-        {!isLoading && !isError && filtered.length > 0 && (
+        {hasSelection && !isLoading && !isError && filtered.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -265,8 +303,8 @@ export function BatchListPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((batch) => (
-                  <tr key={batch.batchId} className="border-b border-gray-50 hover:bg-gray-50">
+                {filtered.map((batch, idx) => (
+                  <tr key={`${batch.batchId}-${idx}`} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">
                       <button
                         type="button"

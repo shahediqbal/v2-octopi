@@ -11,6 +11,7 @@ import {
   useProductFunctions,
   useProductGroups,
 } from '@/hooks/useProducts'
+import { getSubmitToneClass } from '@/lib/actionButtonStyles'
 
 interface ProductFormProps {
   defaultValues?: Partial<ProductFormData>
@@ -166,7 +167,7 @@ export function ProductForm({ defaultValues, onSubmit, isSubmitting, submitLabel
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className={`${getSubmitToneClass(submitLabel)} inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50`}
         >
           {isSubmitting && <Loader2 size={16} className="animate-spin" />}
           {submitLabel}

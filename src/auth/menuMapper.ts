@@ -8,6 +8,7 @@ import type { AppMenuItem, LegacyMenuItem } from '@/types/auth'
  */
 const legacyToV2: Record<string, string> = {
   '/dashboard': '/dashboard',
+  '/super-admin/dashboard': '/super-admin/dashboard',
   '/customers': '/customers',
   '/addcustomer': '/customers/add',
   '/assignemployeetocustomers': '/customers/assign-employees',
@@ -29,7 +30,7 @@ const legacyToV2: Record<string, string> = {
   '/stockout/status': '/sales-orders/status',
   '/stockout/update': '/sales-orders/pending',
   '/salesoperation/stockoutstockrevert': '/sales-orders/delivery-return',
-  '/packingessential/packingrelatedprint': '/sales-orders/packing-print',
+  '/packingessential/packingrelatedprint': '/packing/print-panel',
   '/locationlist': '/locations',
   '/location/add': '/locations/add',
   '/products': '/products',
@@ -40,7 +41,7 @@ const legacyToV2: Record<string, string> = {
   '/function/add': '/products/functions/add',
   '/report/payment': '/reports/payment',
   '/report/sales': '/reports/sales',
-  '/report/delivery-conveyance': '/reports/delivery',
+  '/report/delivery-conveyance': '/reports/delivery-conveyance',
   '/report/mapped': '/reports/mapping',
   '/report/packedbyreport': '/reports/repacking-packed-by',
   '/report/productout': '/reports/product-out',
@@ -82,6 +83,7 @@ const legacyToV2: Record<string, string> = {
   '/lctracking/createlcdoc': '/lc/create',
   '/lctracking/documentactionlist': '/lc/documents',
   '/lctracking/lcpaymentlist': '/lc/payments',
+  '/lctracking/lcpaymentcompletedlist': '/lc/payments/completed',
   '/lctracking/lctrackingreport': '/lc/status',
   '/lc-payments/list': '/lc/payment/edit-list',
   '/lc/list': '/lc/edit-list',

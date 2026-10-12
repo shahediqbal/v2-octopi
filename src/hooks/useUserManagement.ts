@@ -8,6 +8,7 @@ import type {
   SignupPayload,
   UpdateUserRolePayload,
   CreateRolePayload,
+  ChangePasswordPayload,
 } from '@/types/userManagement'
 
 export const userMgmtKeys = {
@@ -77,5 +78,12 @@ export function useCreateRole() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: userMgmtKeys.roles() })
     },
+  })
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (payload: ChangePasswordPayload) =>
+      apiClient.put('/User/ChangePassword', payload),
   })
 }

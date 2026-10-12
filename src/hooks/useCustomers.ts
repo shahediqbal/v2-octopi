@@ -9,6 +9,7 @@ import type {
   UpdateCustomerPayload,
   ApiResponse,
   Channel,
+  Department,
   Designation,
 } from '@/types/customer'
 
@@ -90,6 +91,16 @@ export function useDesignations() {
     queryKey: ['designations', 'list'],
     queryFn: () =>
       apiClient.get<ApiResponse<Designation[]>>('/Designation/GetDesignation').then((r) => r.dataObj),
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** GET /Department/GetDepartment → { departmentId, departmentName }[] */
+export function useDepartments() {
+  return useQuery({
+    queryKey: ['departments', 'list'],
+    queryFn: () =>
+      apiClient.get<ApiResponse<Department[]>>('/Department/GetDepartment').then((r) => r.dataObj),
     staleTime: 5 * 60_000,
   })
 }

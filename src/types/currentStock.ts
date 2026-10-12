@@ -2,6 +2,7 @@ export interface CurrentStockItem {
   productCategoryName: string | null
   productId: number | null
   productName: string | null
+  channelName: string | null
   currentQty: number | null
 }
 

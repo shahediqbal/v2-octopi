@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
 import { chequeStatusSchema, type ChequeStatusFormData } from '@/schemas/chequeSchema'
 import { useChequeStatuses } from '@/hooks/useCheques'
+import { getSubmitToneClass } from '@/lib/actionButtonStyles'
 import type { ChequeDetail } from '@/types/cheque'
 
 interface ChequeStatusFormProps {
@@ -119,7 +120,7 @@ export function ChequeStatusForm({ cheque, defaultValues, onSubmit, isSubmitting
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className={`${getSubmitToneClass(submitLabel)} inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50`}
         >
           {isSubmitting && <Loader2 size={16} className="animate-spin" />}
           {submitLabel}

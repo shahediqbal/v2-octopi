@@ -5,12 +5,12 @@ import type { CurrentStockItem, CurrentStockFilters } from '@/types/currentStock
 
 export const currentStockKeys = {
   all: ['currentStock'] as const,
-  list: (f: CurrentStockFilters) => [...currentStockKeys.all, 'list', f] as const,
+  list: (f: CurrentStockFilters, requestToken = 0) => [...currentStockKeys.all, 'list', f, requestToken] as const,
 }
 
-export function useCurrentStock(filters: CurrentStockFilters, enabled: boolean) {
+export function useCurrentStock(filters: CurrentStockFilters, requestToken = 0, enabled = true) {
   return useQuery({
-    queryKey: currentStockKeys.list(filters),
+    queryKey: currentStockKeys.list(filters, requestToken),
     queryFn: () =>
       apiClient
         .get<ApiResponse<CurrentStockItem[]>>(

@@ -77,7 +77,7 @@ export function UpdateRoleModal({ user, onClose }: UpdateRoleModalProps) {
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50"
+              className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50"
             >
               {isPending && <Loader2 size={14} className="animate-spin" />}
               Save

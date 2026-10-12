@@ -1,8 +1,7 @@
 import { useDropdown } from '@/hooks/useDropdown'
 import { DROPDOWN_REGISTRY } from '@/types/dropdown'
 import type { DropdownType } from '@/types/dropdown'
-import { cn } from '@/lib/utils'
-import { Loader2 } from 'lucide-react'
+import { SearchableSelect } from './SearchableSelect'
 
 interface DropdownSelectProps {
   /** Which dropdown type to load (must be a Load All type) */
@@ -11,6 +10,10 @@ interface DropdownSelectProps {
   value?: number | null
   /** Called when the user selects an option */
   onValueChange: (value: number | null) => void
+  /** Optional: called with the label of the selected option (or null on clear) */
+  onLabelChange?: (label: string | null) => void
+  /** Fallback label for preloaded values not yet present in the fetched list */
+  selectedLabel?: string | null
   /** Placeholder text shown when nothing is selected */
   placeholder?: string
   /** Disable the select */
@@ -47,6 +50,8 @@ export function DropdownSelect({
   type,
   value,
   onValueChange,
+  onLabelChange,
+  selectedLabel,
   placeholder,
   disabled = false,
   hasError = false,
@@ -58,52 +63,19 @@ export function DropdownSelect({
 
   return (
     <div className="relative">
-      <select
-        value={value ?? ''}
-        onChange={(e) => {
-          const val = e.target.value
-          onValueChange(val === '' ? null : Number(val))
-        }}
+      <SearchableSelect
+        options={options ?? []}
+        value={value}
+        onValueChange={onValueChange}
+        onLabelChange={onLabelChange}
+        placeholder={isLoading ? 'Loading...' : placeholderText}
+        selectedLabel={selectedLabel}
+        ariaLabel={config.label}
         disabled={disabled || isLoading}
-        aria-label={config.label}
-        className={cn(
-          'w-full appearance-none rounded-lg border bg-white px-3 py-2 pr-8 text-sm text-gray-900',
-          'focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200',
-          'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400',
-          hasError
-            ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
-            : 'border-gray-300',
-          className
-        )}
-      >
-        <option value="">{isLoading ? 'Loading...' : placeholderText}</option>
-        {options?.map((opt) => (
-          <option key={opt.key} value={opt.key}>
-            {opt.value}
-          </option>
-        ))}
-      </select>
-
-      {/* Chevron icon */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-        {isLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-        ) : (
-          <svg
-            className="h-4 w-4 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        )}
-      </div>
+        hasError={hasError}
+        className={className}
+        emptyMessage={`No ${config.label.toLowerCase()} options found`}
+      />
 
       {isError && (
         <p className="mt-1 text-xs text-red-500">

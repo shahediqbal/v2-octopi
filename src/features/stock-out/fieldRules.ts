@@ -95,8 +95,8 @@ export const STOCK_OUT_FIELD_RULES: Record<EditMode, Record<StockOutFieldKey, St
     product: 'readonly',
     quantity: 'editable',
     price: 'editable',
-    discount: 'editable',
-    tax: 'editable',
+    discount: 'hidden',
+    tax: 'hidden',
     packaging: 'hidden',
   },
   'admin-invoice-limited': {

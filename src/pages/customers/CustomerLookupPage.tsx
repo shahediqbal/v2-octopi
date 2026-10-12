@@ -57,7 +57,7 @@ export function CustomerLookupPage() {
             <PaginatedCombobox
               type="product"
               value={productId}
-              onChange={(id) => setProductId(id)}
+              onValueChange={(id) => setProductId(id)}
               placeholder="Search product…"
             />
           </div>
@@ -101,7 +101,7 @@ export function CustomerLookupPage() {
             <PaginatedCombobox
               type="customer"
               value={customerId}
-              onChange={(id) => setCustomerId(id)}
+              onValueChange={(id) => setCustomerId(id)}
               placeholder="Search customer…"
             />
           </div>
@@ -127,6 +127,13 @@ export function CustomerLookupPage() {
               />
               <InfoRow label="Payment Mode" value={customer.paymentMode ?? '-'} />
               <InfoRow label="Status" value={customer.currentStatus ?? '-'} />
+              <InfoRow
+                label="Dispute Amount"
+                value={(customer.disputeAmount ?? 0).toLocaleString('en-BD', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              />
               <InfoRow label="Special Note" value={customer.specialNote ?? '-'} />
             </dl>
           )}

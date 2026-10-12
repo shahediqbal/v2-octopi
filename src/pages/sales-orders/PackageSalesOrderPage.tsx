@@ -12,6 +12,15 @@ import {
 import { applyAutoFill, removePackagingRow, updatePackagingRow, validatePackagingRows } from '@/pages/sales-orders/packagingUtils'
 import { useCompletePackaging, useStockOutDetail, useStockOutLookups } from '@/hooks/useStockOut'
 
+function SummaryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</p>
+      <p className="mt-1 text-sm font-medium text-gray-900">{value}</p>
+    </div>
+  )
+}
+
 export function PackageSalesOrderPage() {
   const { id } = useParams<{ id: string }>()
   const salesOrderId = Number(id)
@@ -21,6 +30,7 @@ export function PackageSalesOrderPage() {
   const packageMutation = useCompletePackaging()
   const [rows, setRows] = useState<PackagingRowValue[]>([])
   const [serverError, setServerError] = useState('')
+  const packTypes = lookups?.packTypes ?? []
 
   useEffect(() => {
     if (detail) {
@@ -29,6 +39,30 @@ export function PackageSalesOrderPage() {
   }, [detail])
 
   const validation = useMemo(() => validatePackagingRows(rows), [rows])
+  const globalPackTypeId = useMemo(() => {
+    if (rows.length === 0) {
+      return ''
+    }
+
+    const firstPackTypeId = rows[0]?.sopPackId ?? ''
+    if (!firstPackTypeId) {
+      return ''
+    }
+
+    return rows.every((row) => row.sopPackId === firstPackTypeId) ? firstPackTypeId : ''
+  }, [rows])
+
+  const handleGlobalPackTypeChange = (packTypeId: string) => {
+    const selectedPackType = packTypes.find((option) => String(option.id) === packTypeId)
+
+    setRows((current) =>
+      current.map((row) => ({
+        ...row,
+        sopPackId: packTypeId,
+        packLabel: selectedPackType?.label ?? '',
+      })),
+    )
+  }
 
   const handleSubmit = async () => {
     setServerError('')
@@ -89,11 +123,37 @@ export function PackageSalesOrderPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <SummaryMetric label="Order No" value={detail.stockOutGeneralData.soSystemNo ?? String(salesOrderId)} />
+          <SummaryMetric label="Customer" value={detail.stockOutGeneralData.customerName ?? '—'} />
+          <SummaryMetric label="Order Type" value={detail.stockOutGeneralData.jobTypeName ?? '—'} />
+          <SummaryMetric label="Validation" value={validation.isValid ? 'Ready to submit' : 'Needs correction'} />
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-5 max-w-sm">
+            <label htmlFor="global-pack-type" className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Pack Type
+            </label>
+            <select
+              id="global-pack-type"
+              value={globalPackTypeId}
+              onChange={(event) => handleGlobalPackTypeChange(event.target.value)}
+              disabled={rows.length === 0 || packTypes.length === 0}
+              className="mt-2 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+            >
+              <option value="">Select pack type for all</option>
+              {packTypes.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-gray-500">Applying a value here updates the pack type for every row in the packaging grid.</p>
+          </div>
+
           <PackagingItemTable
             rows={rows}
-            packTypes={lookups?.packTypes ?? []}
+            packTypes={packTypes}
             onToggleAutoFill={(rowId, enabled) => setRows((current) => applyAutoFill(current, rowId, enabled))}
             onFieldChange={(rowId, field, value) => setRows((current) => updatePackagingRow(current, rowId, field, value))}
             onRemove={(rowId) => setRows((current) => removePackagingRow(current, rowId))}
@@ -104,7 +164,7 @@ export function PackageSalesOrderPage() {
               type="button"
               onClick={handleSubmit}
               disabled={packageMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {packageMutation.isPending && <Loader2 size={16} className="animate-spin" />}
               Submit packaging
@@ -112,24 +172,6 @@ export function PackageSalesOrderPage() {
           </div>
         </div>
 
-        <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Order No</p>
-            <p className="mt-1 text-sm font-medium text-gray-900">{detail.stockOutGeneralData.soSystemNo ?? salesOrderId}</p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Customer</p>
-            <p className="mt-1 text-sm font-medium text-gray-900">{detail.stockOutGeneralData.customerName ?? '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Order Type</p>
-            <p className="mt-1 text-sm font-medium text-gray-900">{detail.stockOutGeneralData.jobTypeName ?? '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Validation</p>
-            <p className="mt-1 text-sm font-medium text-gray-900">{validation.isValid ? 'Ready to submit' : 'Needs correction'}</p>
-          </div>
-        </div>
       </div>
     </div>
   )

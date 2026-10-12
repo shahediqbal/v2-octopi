@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
 import { locationSchema, type LocationFormData } from '@/schemas/locationSchema'
+import { getSubmitToneClass } from '@/lib/actionButtonStyles'
 
 interface LocationFormProps {
   defaultValues?: Partial<LocationFormData>
@@ -62,7 +63,7 @@ export function LocationForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className={`${getSubmitToneClass(submitLabel)} inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50`}
         >
           {isSubmitting && <Loader2 size={16} className="animate-spin" />}
           {submitLabel}

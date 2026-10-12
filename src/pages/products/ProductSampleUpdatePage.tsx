@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, ArrowLeft, Loader2, Search, TestTubeDiagonal } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useProductCategories, useProductsByCategory, useUpdateProductSamples } from '@/hooks/useProducts'
+import type { Product } from '@/types/product'
+
+const EMPTY_PRODUCTS: Product[] = []
 
 export function ProductSampleUpdatePage() {
   const [categoryId, setCategoryId] = useState<number | null>(null)
@@ -11,7 +14,7 @@ export function ProductSampleUpdatePage() {
   const [savedOnce, setSavedOnce] = useState(false)
 
   const { data: categories, isLoading: loadingCategories } = useProductCategories()
-  const { data: categoryProducts = [], isLoading, isError, error } = useProductsByCategory(categoryId)
+  const { data: categoryProducts = EMPTY_PRODUCTS, isLoading, isError, error } = useProductsByCategory(categoryId)
   const updateSamplesMutation = useUpdateProductSamples()
 
   useEffect(() => {
@@ -172,7 +175,7 @@ export function ProductSampleUpdatePage() {
                 type="button"
                 onClick={handleSave}
                 disabled={updateSamplesMutation.isPending || !categoryId}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {updateSamplesMutation.isPending && <Loader2 size={16} className="animate-spin" />}
                 Save Sample Assignment

@@ -20,13 +20,6 @@ export const STANDARD_STOCK_OUT_TABS: StockOutModeTab[] = [
   { value: '0', label: 'Created' },
 ]
 
-export const ADMIN_STOCK_OUT_TABS: StockOutModeTab[] = [
-  { value: '0', label: 'Created' },
-  { value: '1', label: 'Escalated' },
-  { value: '2', label: 'In Progress' },
-  { value: '3', label: 'Done' },
-]
-
 export const LIST_MODE_CONFIG: Record<ListMode, ListModeConfig> = {
   standard: {
     title: 'Sales Orders',
@@ -55,19 +48,19 @@ export const LIST_MODE_CONFIG: Record<ListMode, ListModeConfig> = {
     tabs: [],
   },
   'admin-general': {
-    title: 'Admin Sales Orders',
-    description: 'Administrative stock-out review across statuses.',
-    tabs: ADMIN_STOCK_OUT_TABS,
+    title: 'Admin Control',
+    description: 'Advance Sales Order',
+    tabs: [],
   },
   'admin-pending-price': {
     title: 'Pending Price Orders',
-    description: 'Orders waiting for price review.',
-    tabs: ADMIN_STOCK_OUT_TABS,
+    description: 'See Pending Price',
+    tabs: [],
   },
   'admin-limited-edit': {
     title: 'Limited Invoice Edit',
     description: 'Orders available for invoice-limited editing.',
-    tabs: ADMIN_STOCK_OUT_TABS,
+    tabs: [],
   },
 }
 

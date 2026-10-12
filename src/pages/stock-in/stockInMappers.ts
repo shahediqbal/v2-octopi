@@ -5,11 +5,20 @@ import type {
 } from '@/schemas/stockInSchema'
 import type { StockInItemData } from '@/types/stockIn'
 
-function pickText(...values: Array<string | null | undefined>) {
+type TextValue = string | number | null | undefined
+
+type StockInPackSource = Omit<Partial<StockInPackFormData>, 'sipPackSize'> & {
+  sipPackSize?: TextValue
+}
+
+function pickText(...values: TextValue[]) {
   for (const value of values) {
     if (typeof value === 'string') {
       const trimmed = value.trim()
       if (trimmed) return trimmed
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value)
     }
   }
   return ''
@@ -26,7 +35,7 @@ function toNullableNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function buildPackDetails(pack: Partial<StockInPackFormData>) {
+function buildPackDetails(pack: StockInPackSource) {
   const explicit = pickText(pack.packDetails)
   if (explicit) return explicit
 
@@ -62,13 +71,13 @@ export function normalizeStockInBatchForForm(
 }
 
 export function normalizeStockInPackForForm(
-  pack: Partial<StockInPackFormData> | null | undefined,
+  pack: StockInPackSource | null | undefined,
 ): StockInPackFormData {
   const packTypeId = toNullableNumber(pack?.packTypeId ?? pack?.sipPackTypeId)
   const packQuantity = toNullableNumber(pack?.packQuantity ?? pack?.sipPackQty)
   const packTypeName = pickText(pack?.packTypeName)
   const packDetails = buildPackDetails(pack ?? {})
-  const packSize = pickText(pack?.sipPackSize, packDetails)
+  const packSize = pickText(pack?.sipPackSize)
   const packRemarks = pickText(pack?.sipPackRemarks) || null
 
   return {

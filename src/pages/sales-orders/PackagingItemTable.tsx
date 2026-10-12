@@ -17,17 +17,17 @@ export function PackagingItemTable({ rows, packTypes, onToggleAutoFill, onFieldC
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
+        <table className="min-w-[1060px] text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
             <tr>
-              <th className="px-4 py-3">Product</th>
-              <th className="px-4 py-3">Order Qty</th>
-              <th className="px-4 py-3 text-center">Auto Fill</th>
-              <th className="px-4 py-3">Pack Size</th>
-              <th className="px-4 py-3">Pack Type</th>
-              <th className="px-4 py-3">Pack No</th>
-              <th className="px-4 py-3">Pack Qty</th>
-              <th className="px-4 py-3 text-center">Action</th>
+              <th className="min-w-[180px] px-4 py-3">Product</th>
+              <th className="min-w-[110px] px-4 py-3">Order Qty</th>
+              <th className="min-w-[90px] px-4 py-3 text-center">Auto Fill</th>
+              <th className="min-w-[120px] px-4 py-3">Pack Size</th>
+              <th className="min-w-[260px] px-4 py-3">Pack Type</th>
+              <th className="min-w-[110px] px-4 py-3">Pack No</th>
+              <th className="min-w-[120px] px-4 py-3">Pack Qty</th>
+              <th className="min-w-[120px] px-4 py-3 text-center">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -54,7 +54,7 @@ export function PackagingItemTable({ rows, packTypes, onToggleAutoFill, onFieldC
                     className={inputCls}
                   />
                 </td>
-                <td className="px-4 py-3 min-w-[14rem]">
+                <td className="px-4 py-3 min-w-[16rem]">
                   <select
                     value={row.sopPackId}
                     onChange={(event) => {

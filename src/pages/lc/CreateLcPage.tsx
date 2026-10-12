@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { lcCreateSchema } from '@/schemas/lcTrackingSchema'
 import type { LcCreateFormValues } from '@/schemas/lcTrackingSchema'
-import { useCreateLc } from '@/hooks/useLcTracking'
+import { useCreateLc, usePiDetail } from '@/hooks/useLcTracking'
 import { useToastStore } from '@/stores/toastStore'
 import { DropdownSelect } from '@/components/dropdowns/DropdownSelect'
 import { PaginatedCombobox } from '@/components/dropdowns/PaginatedCombobox'
@@ -28,6 +28,7 @@ export function CreateLcPage() {
     control,
     handleSubmit,
     register,
+    setValue,
     formState: { errors },
   } = useForm<LcCreateFormValues>({
     resolver: zodResolver(lcCreateSchema),
@@ -35,12 +36,22 @@ export function CreateLcPage() {
       lcNumber: '',
       lcAmount: 0,
       lcDate: '',
-      chequeBankId: 0,
-      locationId: 0,
+      lcIssuerBankId: 0,
+      lcIssuerBranchLocationId: 0,
     },
   })
 
   const createMutation = useCreateLc()
+  const { data: piData } = usePiDetail(piId > 0 ? piId : undefined)
+
+  useEffect(() => {
+    if (!piData) {
+      return
+    }
+
+    const normalizedPiAmount = Number(piData.piAmount ?? 0)
+    setValue('lcAmount', Number.isNaN(normalizedPiAmount) ? 0 : normalizedPiAmount)
+  }, [piData, setValue])
 
   const onSubmit = (data: LcCreateFormValues) => {
     setServerError('')
@@ -50,8 +61,8 @@ export function CreateLcPage() {
         lcNumber: data.lcNumber,
         lcAmount: data.lcAmount,
         lcDate: data.lcDate,
-        chequeBankId: data.chequeBankId,
-        locationId: data.locationId,
+        lcIssuerBankId: data.lcIssuerBankId,
+        lcIssuerBranchLocationId: data.lcIssuerBranchLocationId,
       },
       {
         onSuccess: (res) => {
@@ -80,6 +91,39 @@ export function CreateLcPage() {
           {piId > 0 && <p className="text-xs text-gray-500">PI ID: {piId}</p>}
         </div>
       </div>
+
+      {/* PI Information */}
+      {piData && (
+        <div className="rounded-xl border border-gray-300 bg-gray-50 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-gray-700">PI Information</h2>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+            <div>
+              <span className="font-medium text-gray-600">PI System ID: </span>
+              <span className="text-gray-900">{piData.piSystemId}</span>
+            </div>
+            <div>
+              <span className="font-medium text-gray-600">PI Number: </span>
+              <span className="text-gray-900">{piData.piNumber}</span>
+            </div>
+            <div>
+              <span className="font-medium text-gray-600">PI Date: </span>
+              <span className="text-gray-900">
+                {piData.piDate ? new Date(piData.piDate).toLocaleDateString() : 'N/A'}
+              </span>
+            </div>
+            <div>
+              <span className="font-medium text-gray-600">Customer Name: </span>
+              <span className="text-gray-900">{piData.customerName}</span>
+            </div>
+            <div className="sm:col-span-2">
+              <span className="font-medium text-gray-600">PI Amount: </span>
+              <span className="text-gray-900">
+                {piData.piAmount != null ? `${piData.piCurrency} ${Number(piData.piAmount).toFixed(2)}` : 'N/A'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         {serverError && (
@@ -136,7 +180,7 @@ export function CreateLcPage() {
             <div>
               <label className={LABEL}>Issuer Bank *</label>
               <Controller
-                name="chequeBankId"
+                name="lcIssuerBankId"
                 control={control}
                 render={({ field, fieldState }) => (
                   <DropdownSelect
@@ -148,25 +192,25 @@ export function CreateLcPage() {
                   />
                 )}
               />
-              {errors.chequeBankId && <p className={ERR_MSG}>{errors.chequeBankId.message}</p>}
+              {errors.lcIssuerBankId && <p className={ERR_MSG}>{errors.lcIssuerBankId.message}</p>}
             </div>
 
             {/* Branch Location */}
             <div>
               <label className={LABEL}>Branch Location *</label>
               <Controller
-                name="locationId"
+                name="lcIssuerBranchLocationId"
                 control={control}
                 render={({ field }) => (
                   <PaginatedCombobox
                     type="location"
                     value={field.value || null}
                     onValueChange={(v) => field.onChange(v ?? 0)}
-                    hasError={!!errors.locationId}
+                    hasError={!!errors.lcIssuerBranchLocationId}
                   />
                 )}
               />
-              {errors.locationId && <p className={ERR_MSG}>{errors.locationId.message}</p>}
+              {errors.lcIssuerBranchLocationId && <p className={ERR_MSG}>{errors.lcIssuerBranchLocationId.message}</p>}
             </div>
           </div>
 
@@ -174,7 +218,7 @@ export function CreateLcPage() {
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
+              className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
             >
               {createMutation.isPending && <Loader2 size={14} className="animate-spin" />}
               Create LC

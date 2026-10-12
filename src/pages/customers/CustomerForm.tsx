@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
@@ -11,6 +11,7 @@ import {
   currentStatusOptions,
 } from '@/schemas/customerSchema'
 import { useChannels, useDesignations, useEmployeesByChannel } from '@/hooks/useCustomers'
+import { getSubmitToneClass } from '@/lib/actionButtonStyles'
 
 interface CustomerFormProps {
   defaultValues?: Partial<CustomerFormData>
@@ -27,6 +28,8 @@ export function CustomerForm({
   submitLabel,
   serverError,
 }: CustomerFormProps) {
+  const previousChannelIdRef = useRef<number | null | undefined>(undefined)
+
   const {
     register,
     handleSubmit,
@@ -51,13 +54,17 @@ export function CustomerForm({
       currentStatus: '',
       linkCustomerId: null,
       specialNote: '',
+      disputeAmount: 0,
       ...defaultValues,
     },
   })
 
   /* re-sync when defaultValues change (edit page loads data async) */
   useEffect(() => {
-    if (defaultValues) reset({ ...defaultValues })
+    if (defaultValues) {
+      previousChannelIdRef.current = defaultValues.channelId ?? null
+      reset({ ...defaultValues })
+    }
   }, [defaultValues, reset])
 
   const channelId = watch('channelId')
@@ -69,7 +76,15 @@ export function CustomerForm({
 
   /* clear employee when channel changes */
   useEffect(() => {
-    setValue('employeeId', null)
+    if (previousChannelIdRef.current === undefined) {
+      previousChannelIdRef.current = channelId
+      return
+    }
+
+    if (previousChannelIdRef.current !== channelId) {
+      previousChannelIdRef.current = channelId
+      setValue('employeeId', null)
+    }
   }, [channelId, setValue])
 
   return (
@@ -96,6 +111,17 @@ export function CustomerForm({
             <input {...register('contactPersonName')} className={inputCls} placeholder="Contact person" />
           </Field>
 
+          <Field label="Contact Person Designation" error={errors.designationId?.message}>
+            <select {...register('designationId', numericNullable)} className={inputCls} disabled={loadingDesignations}>
+              <option value="">Select designation</option>
+              {designations?.map((d) => (
+                <option key={d.designationId} value={d.designationId}>
+                  {d.designation1}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           <Field label="Phone" error={errors.contactNumber?.message}>
             <input {...register('contactNumber')} className={inputCls} placeholder="01XXXXXXXXX" />
           </Field>
@@ -112,7 +138,7 @@ export function CustomerForm({
           Organisation
         </legend>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Channel" error={errors.channelId?.message}>
             <select {...register('channelId', numericNullable)} className={inputCls} disabled={loadingChannels}>
               <option value="">Select channel</option>
@@ -124,7 +150,7 @@ export function CustomerForm({
             </select>
           </Field>
 
-          <Field label="Employee" error={errors.employeeId?.message}>
+          <Field label="Belongs To" error={errors.employeeId?.message}>
             <select
               {...register('employeeId', numericNullable)}
               className={inputCls}
@@ -134,17 +160,6 @@ export function CustomerForm({
               {employees?.map((emp) => (
                 <option key={emp.key} value={emp.key}>
                   {emp.value}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Designation" error={errors.designationId?.message}>
-            <select {...register('designationId', numericNullable)} className={inputCls} disabled={loadingDesignations}>
-              <option value="">Select designation</option>
-              {designations?.map((d) => (
-                <option key={d.designationId} value={d.designationId}>
-                  {d.designation1}
                 </option>
               ))}
             </select>
@@ -216,6 +231,17 @@ export function CustomerForm({
           <Field label="Special Note">
             <input {...register('specialNote')} className={inputCls} placeholder="Optional note" />
           </Field>
+
+          <Field label="Dispute Amount" error={errors.disputeAmount?.message}>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              {...register('disputeAmount', { valueAsNumber: true })}
+              className={inputCls}
+              placeholder="0.00"
+            />
+          </Field>
         </div>
       </fieldset>
 
@@ -224,7 +250,7 @@ export function CustomerForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className={`${getSubmitToneClass(submitLabel)} inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
         >
           {isSubmitting && <Loader2 size={16} className="animate-spin" />}
           {submitLabel}

@@ -64,7 +64,7 @@ export function LocationListPage() {
           </p>
         </div>
 
-        <Link to="/locations/add" className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700">
+        <Link to="/locations/add" className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700">
           <Plus size={16} /> Add Location
         </Link>
       </div>
@@ -131,7 +131,7 @@ export function LocationListPage() {
                         <div className="flex items-center justify-center gap-2">
                           <Link
                             to={`/locations/${location.locationId}/edit`}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-update inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <Pencil size={12} /> Edit
                           </Link>
@@ -139,7 +139,7 @@ export function LocationListPage() {
                             type="button"
                             onClick={() => handleDelete(location.locationId)}
                             disabled={deleteMutation.isPending}
-                            className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="action-delete inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <Trash2 size={12} /> Delete
                           </button>

@@ -10,6 +10,7 @@ import type {
   StockOutCustomerLastPayment,
   StockOutJobSearchResult,
   StockOutLatestBatchMap,
+  //StockOutLastBatchMapOrder,
   StockOutListFilters,
   StockOutListRow,
   StockOutLookupOption,
@@ -70,6 +71,72 @@ function mapBatchLookup(
     .filter((item) => Number.isFinite(item.id) && item.label.length > 0)
 }
 
+// function normalizeLatestBatchMap(
+//   data: StockOutLatestBatchMap | null | undefined,
+// ): StockOutLatestBatchMap | null {
+//   if (!data) return null
+
+//   const lastBatch =
+//     data.lastBatch ??
+//     (data.batchNo != null || data.maxInvoiceDate != null
+//       ? {
+//           batchNo: data.batchNo ?? null,
+//           maxInvoiceDate: data.maxInvoiceDate ?? null,
+//         }
+//       : null)
+
+//   const lastMapProduct =
+//     data.lastMapProduct ??
+//     (data.mappedProductName != null || data.mapProduct != null || data.invoiceDate != null
+//       ? {
+//           mapProduct: data.mapProduct ?? data.mappedProductName ?? null,
+//           invoiceDate: data.invoiceDate ?? null,
+//         }
+//       : null)
+
+//   return {
+//     ...data,
+//     lastBatch,
+//     lastMapProduct,
+//     batchNo: lastBatch?.batchNo ?? data.batchNo ?? null,
+//     mappedProductName: lastMapProduct?.mapProduct ?? data.mappedProductName ?? data.mapProduct ?? null,
+//     maxInvoiceDate: lastBatch?.maxInvoiceDate ?? data.maxInvoiceDate ?? null,
+//     invoiceDate: lastMapProduct?.invoiceDate ?? data.invoiceDate ?? null,
+//   }
+// }
+// function normalizeLastBatchMapOrders(
+//   data: StockOutLatestBatchMap | StockOutLastBatchMapOrder[] | null | undefined,
+// ): StockOutLastBatchMapOrder[] {
+//   if (!data) return []
+
+//   if (Array.isArray(data)) {
+//     return data.slice(0, 3).map((item) => ({
+//       soSystemId: item.soSystemId ?? null,
+//       soSystemNo: item.soSystemNo ?? null,
+//       invoiceDate: item.invoiceDate ?? null,
+//       batchNo: item.batchNo ?? null,
+//       mappedProductName: item.mappedProductName ?? item.mapProduct ?? null,
+//       mapProduct: item.mapProduct ?? item.mappedProductName ?? null,
+//     }))
+//   }
+
+//   const normalized = normalizeLatestBatchMap(data)
+
+//   if (!normalized) return []
+
+//   return [
+//     {
+//       soSystemId: null,
+//       soSystemNo: null,
+//       invoiceDate: normalized.invoiceDate ?? normalized.maxInvoiceDate ?? null,
+//       batchNo: normalized.batchNo ?? null,
+//       mappedProductName: normalized.mappedProductName ?? normalized.mapProduct ?? null,
+//       mapProduct: normalized.mapProduct ?? normalized.mappedProductName ?? null,
+//     },
+//   ]
+// }
+
+
 function normalizeLatestBatchMap(
   data: StockOutLatestBatchMap | null | undefined,
 ): StockOutLatestBatchMap | null {
@@ -86,8 +153,9 @@ function normalizeLatestBatchMap(
 
   const lastMapProduct =
     data.lastMapProduct ??
-    (data.mappedProductName != null || data.mapProduct != null || data.invoiceDate != null
+    (data.mapProduct != null || data.mappedProductName != null || data.invoiceDate != null
       ? {
+          sodMappedProductId: data.sodMappedProductId ?? null,
           mapProduct: data.mapProduct ?? data.mappedProductName ?? null,
           invoiceDate: data.invoiceDate ?? null,
         }
@@ -97,13 +165,36 @@ function normalizeLatestBatchMap(
     ...data,
     lastBatch,
     lastMapProduct,
-    batchNo: lastBatch?.batchNo ?? data.batchNo ?? null,
-    mappedProductName: lastMapProduct?.mapProduct ?? data.mappedProductName ?? data.mapProduct ?? null,
-    maxInvoiceDate: lastBatch?.maxInvoiceDate ?? data.maxInvoiceDate ?? null,
-    invoiceDate: lastMapProduct?.invoiceDate ?? data.invoiceDate ?? null,
+    lastBatches: Array.isArray(data.lastBatches)
+      ? data.lastBatches
+      : lastBatch
+        ? [lastBatch]
+        : [],
+    lastMapProducts: Array.isArray(data.lastMapProducts)
+      ? data.lastMapProducts
+      : lastMapProduct
+        ? [lastMapProduct]
+        : [],
   }
 }
 
+function normalizeLastBatchMapData(
+  data: StockOutLatestBatchMap | null | undefined,
+): StockOutLatestBatchMap {
+  const normalized = normalizeLatestBatchMap(data)
+
+  return {
+    ...(normalized ?? {}),
+    lastBatch: normalized?.lastBatch ?? null,
+    lastMapProduct: normalized?.lastMapProduct ?? null,
+    lastBatches: Array.isArray(normalized?.lastBatches)
+      ? normalized.lastBatches.slice(0, 3)
+      : [],
+    lastMapProducts: Array.isArray(normalized?.lastMapProducts)
+      ? normalized.lastMapProducts.slice(0, 3)
+      : [],
+  }
+}
 function mapPackTypeLookup(
   items: Array<{ packId?: number | null; packTypeName?: string | null; key?: number | null; value?: string | null }> | null | undefined,
 ): StockOutLookupOption[] {
@@ -129,7 +220,7 @@ function buildStockOutListUrl(mode: ListMode, filters: StockOutListFilters): str
   switch (mode) {
     case 'admin-general':
     case 'admin-limited-edit':
-      return `/StockOut/StockOutAdminEidtGridData?startDate=${startDate}&endDate=${endDate}&customerId=${customerId}`
+      return `/StockOut/StockOutAdminEidtGridData?status=3&startDate=${startDate}&endDate=${endDate}&customerId=${customerId}`
     case 'admin-pending-price':
       return '/StockOut/GetSoPendingPriceGrid'
     case 'escalation':
@@ -174,7 +265,7 @@ export const stockOutKeys = {
   samplesByCategory: (categoryId: number) => [...stockOutKeys.all, 'samples-by-category', categoryId] as const,
 }
 
-export function useStockOutList(mode: ListMode, filters: StockOutListFilters) {
+export function useStockOutList(mode: ListMode, filters: StockOutListFilters, enabled = true) {
   return useQuery({
     queryKey: stockOutKeys.list(mode, filters),
     queryFn: () =>
@@ -183,6 +274,7 @@ export function useStockOutList(mode: ListMode, filters: StockOutListFilters) {
         .then((response) => response.dataObj ?? []),
     staleTime: 60_000,
     refetchOnWindowFocus: false,
+    enabled,
   })
 }
 
@@ -309,6 +401,36 @@ export function useLatestStockOutBatchMap(customerId: number | undefined, produc
       apiClient
         .get<StockOutApiResponse<StockOutLatestBatchMap>>(`/StockOut/GetLastMappAndBatchByCustomerAndProduct/${customerId}/${productId}`)
         .then((response) => normalizeLatestBatchMap(response.dataObj)),
+    enabled: !!customerId && !!productId,
+    staleTime: 60_000,
+  })
+}
+// export function useLastThreeStockOutBatchMap(customerId: number | undefined, productId: number | undefined) {
+//   return useQuery({
+//     queryKey: [...stockOutKeys.latestBatch(customerId ?? 0, productId ?? 0), 'last-3'],
+//     queryFn: () =>
+//       apiClient
+//         .get<StockOutApiResponse<StockOutLatestBatchMap | StockOutLastBatchMapOrder[]>>(
+//           `/StockOut/GetLastMappAndBatchByCustomerAndProduct/${customerId}/${productId}?take=3`,
+//         )
+//         .then((response) => normalizeLastBatchMapOrders(response.dataObj)),
+//     enabled: !!customerId && !!productId,
+//     staleTime: 60_000,
+//   })
+// }
+
+export function useLastThreeStockOutBatchMap(
+  customerId: number | undefined,
+  productId: number | undefined,
+) {
+  return useQuery({
+    queryKey: [...stockOutKeys.latestBatch(customerId ?? 0, productId ?? 0), 'last-3'],
+    queryFn: () =>
+      apiClient
+        .get<StockOutApiResponse<StockOutLatestBatchMap>>(
+          `/StockOut/GetLastMappAndBatchByCustomerAndProduct/${customerId}/${productId}`,
+        )
+        .then((response) => normalizeLastBatchMapData(response.dataObj)),
     enabled: !!customerId && !!productId,
     staleTime: 60_000,
   })
@@ -445,6 +567,7 @@ export function useAdminUpdateStockOut() {
     onSuccess: (_response, variables) => {
       queryClient.invalidateQueries({ queryKey: stockOutKeys.lists() })
       queryClient.invalidateQueries({ queryKey: stockOutKeys.detail(variables.stockOutGeneralData.soSystemId) })
+      queryClient.invalidateQueries({ queryKey: stockOutKeys.packaging(variables.stockOutGeneralData.soSystemId) })
     },
   })
 }
@@ -474,7 +597,7 @@ export function useUpdateStockOutStatus() {
         `/StockOut/UpdateStockOutAssociateCurrentStatus/${soSystemId}/${associateCurrenStatus}?soAssociateStatusRemarks=${encodeURIComponent(
           remarks ?? '',
         )}`,
-        '',
+        {},
       ),
     onSuccess: (_response, variables) => {
       queryClient.invalidateQueries({ queryKey: stockOutKeys.lists() })

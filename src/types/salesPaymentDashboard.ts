@@ -7,6 +7,8 @@ export interface SalesPaymentSummaryItem {
 
 export interface MonthlyPurchaseSalesPaymentItem {
   monthName: string | null
+  year: number
+  month: number
   totalPurchase: number | null
   totalSales: number | null
   totalPayment: number | null

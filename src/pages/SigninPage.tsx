@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { env } from '@/config/env'
-import { isAuthenticated } from '@/auth/authBridge'
+import { getDefaultAuthenticatedRoute, isAuthenticated } from '@/auth/authBridge'
 
 interface LoginResponse {
   dataObj?: Record<string, unknown>
@@ -57,7 +57,7 @@ export function SigninPage() {
 
   // If already authenticated, redirect
   if (isAuthenticated()) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to={getDefaultAuthenticatedRoute()} replace />
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -77,7 +77,7 @@ export function SigninPage() {
 
       if (userInfo?.token) {
         localStorage.setItem('userInfo', JSON.stringify(userInfo))
-        navigate('/dashboard', { replace: true })
+        navigate(getDefaultAuthenticatedRoute(), { replace: true })
         return
       }
 

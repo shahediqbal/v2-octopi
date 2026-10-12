@@ -13,7 +13,10 @@ export function useInvoiceDetail(soSystemId: number | null) {
     queryKey: invoiceDetailKeys.detail(soSystemId ?? 0),
     queryFn: () =>
       apiClient
-        .get<ApiResponse<InvoiceDetail>>(`/StockOut/GetStockOutByIdInternal/${soSystemId}`)
+        // .get<ApiResponse<InvoiceDetail>>(`/StockOut/GetStockOutByIdInternal/${soSystemId}`)
+        .get<ApiResponse<InvoiceDetail>>(
+  `/StockOut/GetStockOutOrderDetails/${soSystemId}`
+)
         .then((r) => r.dataObj ?? null),
     enabled: soSystemId != null && soSystemId > 0,
     staleTime: 5 * 60_000,

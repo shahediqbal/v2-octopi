@@ -95,7 +95,7 @@ export function ChequeListPage() {
           </div>
         </div>
 
-        <Link to="/cheques/add" className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700">
+        <Link to="/cheques/add" className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700">
           <Plus size={16} /> Add Cheque
         </Link>
       </div>
@@ -195,14 +195,14 @@ export function ChequeListPage() {
                         <div className="flex items-center justify-center gap-2">
                           <Link
                             to={`/cheques/${item.chequeInfoId}/edit`}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-update inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <Pencil size={12} /> Edit
                           </Link>
                           <button
                             type="button"
                             onClick={() => setStatusChequeId(item.chequeInfoId)}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-update inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <Tags size={12} /> Status
                           </button>

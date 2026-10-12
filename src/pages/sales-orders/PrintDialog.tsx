@@ -7,9 +7,12 @@ interface PrintDialogProps {
   subtitle?: string
   isLoading?: boolean
   errorMessage?: string
+  secondaryActionLabel?: string
+  secondaryActionDisabled?: boolean
   printDisabled?: boolean
   printLabel?: string
   onClose: () => void
+  onSecondaryAction?: () => void
   onPrint?: () => void
   children: ReactNode
 }
@@ -20,9 +23,12 @@ export function PrintDialog({
   subtitle,
   isLoading = false,
   errorMessage,
+  secondaryActionLabel,
+  secondaryActionDisabled = false,
   printDisabled = false,
   printLabel = 'Print / Save PDF',
   onClose,
+  onSecondaryAction,
   onPrint,
   children,
 }: PrintDialogProps) {
@@ -69,12 +75,22 @@ export function PrintDialog({
           >
             Close
           </button>
+          {onSecondaryAction && secondaryActionLabel && (
+            <button
+              type="button"
+              onClick={onSecondaryAction}
+              disabled={isLoading || !!errorMessage || secondaryActionDisabled}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {secondaryActionLabel}
+            </button>
+          )}
           {onPrint && (
             <button
               type="button"
               onClick={onPrint}
               disabled={isLoading || !!errorMessage || printDisabled}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="action-view inline-flex items-center gap-2 rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Printer size={16} />
               {printLabel}

@@ -1,4 +1,5 @@
 import { Trash2 } from 'lucide-react'
+import { SearchableSelect } from '@/components/dropdowns'
 import type { PackingItem, PackType } from '@/types/stickerPacking'
 
 interface PackingItemRowProps {
@@ -13,6 +14,8 @@ export function PackingItemRow({ item, packTypes, employees, onChange, onDelete 
   const packSize = Number(item.packSize) || 0
   const packNo = Number(item.packNo) || 0
   const computed = packSize * packNo
+  const packTypeOptions = packTypes.map((pt) => ({ key: pt.packId, value: pt.packTypeName }))
+  const employeeOptions = employees.map((emp) => ({ key: emp.id, value: emp.label }))
 
   function handlePackSizeChange(val: string) {
     const ps = Number(val) || 0
@@ -41,18 +44,15 @@ export function PackingItemRow({ item, packTypes, employees, onChange, onDelete 
         />
       </td>
       <td className="px-3 py-2">
-        <select
+        <SearchableSelect
+          options={packTypeOptions}
           value={item.sopPackId ?? ''}
-          onChange={(e) => onChange(item.index, { sopPackId: e.target.value ? Number(e.target.value) : null })}
-          className="w-32 rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
-        >
-          <option value="">-- Pack Type --</option>
-          {packTypes.map((pt) => (
-            <option key={pt.packId} value={pt.packId}>
-              {pt.packTypeName}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => onChange(item.index, { sopPackId: value })}
+          placeholder="Select pack type"
+          ariaLabel={`${item.productName} pack type`}
+          className="w-32 px-2 py-1 text-sm"
+          emptyMessage="No pack type options found"
+        />
       </td>
       <td className="px-3 py-2">
         <input
@@ -69,18 +69,15 @@ export function PackingItemRow({ item, packTypes, employees, onChange, onDelete 
         {isOverQty && <span className="ml-1 text-xs">(exceeds qty)</span>}
       </td>
       <td className="px-3 py-2">
-        <select
-          value={item.packedBy ?? ''}
-          onChange={(e) => onChange(item.index, { packedBy: e.target.value ? Number(e.target.value) : null })}
-          className="w-36 rounded border border-gray-300 px-2 py-1 text-sm focus:border-gray-500 focus:outline-none"
-        >
-          <option value="">-- Employee --</option>
-          {employees.map((emp) => (
-            <option key={emp.id} value={emp.id}>
-              {emp.label}
-            </option>
-          ))}
-        </select>
+        <SearchableSelect
+          options={employeeOptions}
+          value={item.packedBy}
+          onValueChange={(value) => onChange(item.index, { packedBy: value })}
+          placeholder="Select employee"
+          ariaLabel={`${item.productName} packed by`}
+          className="w-36 px-2 py-1 text-sm"
+          emptyMessage="No employee options found"
+        />
       </td>
       <td className="px-3 py-2 text-center">
         <button

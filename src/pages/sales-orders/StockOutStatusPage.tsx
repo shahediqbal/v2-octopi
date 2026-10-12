@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, FileSpreadsheet, Loader2, RefreshCw, RotateCcw, Search } from 'lucide-react'
+import { useToastStore } from '@/stores/toastStore'
 import {
   useStockOutPendingPopup,
   useStockOutPendingStatuses,
@@ -30,13 +31,18 @@ function getAllPendingOption(scope: 'work' | 'decision'): StockOutLookupOption {
 }
 
 export function StockOutStatusPage() {
+  const showToast = useToastStore((s) => s.showToast)
   const [pendingScope, setPendingScope] = useState<'work' | 'decision'>('work')
   const [selectedPendingId, setSelectedPendingId] = useState<string>('')
   const [search, setSearch] = useState('')
   const [selectedRow, setSelectedRow] = useState<StockOutListRow | null>(null)
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null)
 
-  const { data: pendingStatuses = [], isLoading: loadingStatuses } = useStockOutPendingStatuses('true')
+  const { data: pendingStatuses = [], isLoading: loadingStatuses } = useStockOutPendingStatuses(
+    pendingScope === 'decision' ? 'true' : 'false',
+  )
+  // Modal always uses decision-pending options (stock_out/true) — matches legacy DefinePendingStatusModal
+  const { data: modalStatusOptions = [] } = useStockOutPendingStatuses('true')
   const statusOptions = useMemo(
     () => [getAllPendingOption(pendingScope), ...pendingStatuses],
     [pendingScope, pendingStatuses],
@@ -97,24 +103,37 @@ export function StockOutStatusPage() {
   }
 
   const handleResume = async (row: StockOutListRow) => {
-    await updateStatusMutation.mutateAsync({
-      soSystemId: row.soSystemId,
-      associateCurrenStatus: 20,
-      remarks: '',
-    })
+    try {
+      await updateStatusMutation.mutateAsync({
+        soSystemId: row.soSystemId,
+        associateCurrenStatus: 20,
+        remarks: 'Resumed',
+      })
+      showToast({ message: 'Order resumed successfully', type: 'success' })
+      void refetch()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to resume order'
+      showToast({ message, type: 'error' })
+    }
   }
 
   const handleModalSubmit = async (statusId: number, remarks: string) => {
     if (!selectedRow) return
 
-    await updateStatusMutation.mutateAsync({
-      soSystemId: selectedRow.soSystemId,
-      associateCurrenStatus: statusId,
-      remarks,
-    })
-
-    setSelectedRow(null)
-    setSelectedRowId(null)
+    try {
+      await updateStatusMutation.mutateAsync({
+        soSystemId: selectedRow.soSystemId,
+        associateCurrenStatus: statusId,
+        remarks,
+      })
+      showToast({ message: 'Pending status updated successfully', type: 'success' })
+      setSelectedRow(null)
+      setSelectedRowId(null)
+      void refetch()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update status'
+      showToast({ message, type: 'error' })
+    }
   }
 
   return (
@@ -133,7 +152,7 @@ export function StockOutStatusPage() {
                 type="button"
                 onClick={() => setPendingScope('work')}
                 className={pendingScope === 'work'
-                  ? 'flex-1 rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white'
+                  ? 'action-select flex-1 rounded-md px-3 py-2 text-sm font-semibold text-white'
                   : 'flex-1 rounded-md px-3 py-2 text-sm font-semibold text-gray-700'}
               >
                 Work Pending
@@ -142,7 +161,7 @@ export function StockOutStatusPage() {
                 type="button"
                 onClick={() => setPendingScope('decision')}
                 className={pendingScope === 'decision'
-                  ? 'flex-1 rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white'
+                  ? 'action-select flex-1 rounded-md px-3 py-2 text-sm font-semibold text-white'
                   : 'flex-1 rounded-md px-3 py-2 text-sm font-semibold text-gray-700'}
               >
                 Decision Pending
@@ -180,7 +199,7 @@ export function StockOutStatusPage() {
             <button
               type="button"
               onClick={() => refetch()}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              className="action-report inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
             >
               <RefreshCw size={16} /> Refresh
             </button>
@@ -188,7 +207,7 @@ export function StockOutStatusPage() {
               type="button"
               onClick={handleExport}
               disabled={filteredRows.length === 0}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FileSpreadsheet size={16} /> Excel
             </button>
@@ -245,7 +264,7 @@ export function StockOutStatusPage() {
                             type="button"
                             onClick={() => void handleResume(row)}
                             disabled={updateStatusMutation.isPending}
-                            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-50"
+                            className="action-update inline-flex items-center gap-1 rounded-md border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-50"
                           >
                             <RotateCcw size={12} /> Resume
                           </button>
@@ -256,7 +275,7 @@ export function StockOutStatusPage() {
                               setSelectedRow(row)
                               setSelectedRowId(row.soSystemId)
                             }}
-                            className="inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-update inline-flex items-center rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             Update
                           </button>
@@ -283,7 +302,7 @@ export function StockOutStatusPage() {
       {selectedRowId != null && (
         <StatusUpdateModal
           item={(pendingPopup ?? selectedRow) as StockOutPendingPopupItem | null}
-          options={pendingStatuses}
+          options={modalStatusOptions}
           isSubmitting={updateStatusMutation.isPending || loadingPopup}
           onClose={() => {
             setSelectedRow(null)

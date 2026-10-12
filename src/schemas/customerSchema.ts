@@ -20,6 +20,7 @@ export const customerSchema = z.object({
   currentStatus: z.string(),
   linkCustomerId: z.number().nullable(),
   specialNote: z.string(),
+  disputeAmount: z.number().min(0, 'Dispute amount cannot be negative'),
 })
 
 export type CustomerFormData = z.infer<typeof customerSchema>

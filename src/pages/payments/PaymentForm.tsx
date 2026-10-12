@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
-import { PaginatedCombobox, DropdownSelect } from '@/components/dropdowns'
+//import { PaginatedCombobox, DropdownSelect } from '@/components/dropdowns'
+import { PaginatedCombobox, DropdownSelect, SearchableSelect } from '@/components/dropdowns'
 import { paymentFormSchema, type PaymentFormData } from '@/schemas/paymentSchema'
 import { PAYMENT_TYPES, PAYMENT_TYPE_OPTIONS, PAYMENT_METHOD_MAP } from '@/types/payment'
 import type { PaymentType, CreatePaymentPayload, UpdatePaymentPayload } from '@/types/payment'
@@ -13,6 +14,7 @@ import {
   useInvoiceMetadata,
 } from '@/hooks/usePayments'
 import { useChequeDetail } from '@/hooks/useCheques'
+import { getSubmitToneClass } from '@/lib/actionButtonStyles'
 import { LcRedirectModal } from './LcRedirectModal'
 
 // ─────────────────── Helpers ───────────────────
@@ -438,21 +440,31 @@ export function PaymentForm({
                 error={errors.invoiceChequeId?.message}
               >
                 {isInvoiceType ? (
-                  <select
-                    {...register('invoiceChequeId', numericNullable)}
-                    disabled={!customerId || loadingInvoices}
-                    className={errors.invoiceChequeId ? inputErrorCls : inputCls}
-                  >
-                    <option value="">
-                      {!customerId ? '— Select customer first —' : loadingInvoices ? 'Loading…' : '— Select invoice —'}
-                    </option>
-                    {(invoices ?? []).map((inv) => (
-                      <option key={inv.id} value={inv.id}>
-                        {inv.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
+  <Controller
+    name="invoiceChequeId"
+    control={control}
+    render={({ field, fieldState }) => (
+      <SearchableSelect
+        options={(invoices ?? []).map((inv) => ({
+          key: inv.id,
+          value: inv.label,
+        }))}
+        value={field.value}
+        onValueChange={field.onChange}
+        placeholder={
+          !customerId
+            ? '— Select customer first —'
+            : loadingInvoices
+              ? 'Loading…'
+              : 'Search invoice...'
+        }
+        ariaLabel="Invoice No"
+        disabled={!customerId || loadingInvoices}
+        hasError={!!fieldState.error}
+      />
+    )}
+  />
+) : (
                   <select
                     {...register('invoiceChequeId', numericNullable)}
                     disabled={!customerId || loadingCheques}
@@ -486,8 +498,7 @@ export function PaymentForm({
 
             {/* Money Receipt No — Invoice/Open */}
             {showMoneyReceipt && (
-              <Field label="Money Receipt No" error={errors.moneyReceiptNo?.message}>
-                <input
+             <Field label="Money Receipt No *" error={errors.moneyReceiptNo?.message}>   <input
                   type="text"
                   {...register('moneyReceiptNo')}
                   className={errors.moneyReceiptNo ? inputErrorCls : inputCls}
@@ -548,7 +559,7 @@ export function PaymentForm({
 
             {/* Payment Note — always visible */}
             <div className="md:col-span-2">
-              <Field label="Payment Note" error={errors.paymentNote?.message}>
+            <Field label="Payment Note *" error={errors.paymentNote?.message}>
                 <textarea
                   {...register('paymentNote')}
                   rows={2}
@@ -614,7 +625,7 @@ export function PaymentForm({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            className={`${getSubmitToneClass(submitLabel)} inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50`}
           >
             {isSubmitting && <Loader2 size={14} className="animate-spin" />}
             {submitLabel}

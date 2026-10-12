@@ -111,7 +111,7 @@ export function EditSellingPricePage() {
             <button
               type="submit"
               disabled={updateMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
+              className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
             >
               {updateMutation.isPending && <Loader2 size={14} className="animate-spin" />}
               Update

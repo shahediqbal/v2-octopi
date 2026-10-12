@@ -16,12 +16,40 @@ import type {
   TaskDetail,
   TaskDetailApiResponse,
   TaskNameResponse,
+  TaskTransportItem,
   TaskUpdateResponse,
   TransportEndLocationPayload,
   UpdateTaskPayload,
   UpdateTransportPayload,
 } from '@/types/task'
 import { stockOutKeys } from '@/hooks/useStockOut'
+
+interface TransportMutationResponse {
+  dataObj?: {
+    data?: number | null
+  }
+}
+
+function buildCachedTransport(
+  payload: AddTransportPayload | UpdateTransportPayload,
+  taskTransportationAutoId: number,
+): TaskTransportItem {
+  return {
+    taskTransportationAutoId,
+    taskTransportationVehicleId: payload.taskTransportationVehicleId,
+    vehicleName: payload.vehicleName ?? null,
+    taskTransportationStartLocationId: payload.taskTransportationStartLocationId ?? null,
+    taskTransportationStartLocation: payload.taskTransportationStartLocation,
+    taskTransportationEndLocationId: payload.taskTransportationEndLocationId ?? null,
+    taskTransportationEndLocation: payload.taskTransportationEndLocation,
+    taskTransportationStartLat: payload.taskTransportationStartLat,
+    taskTransportationStartLong: payload.taskTransportationStartLong,
+    taskTransportationEndLat: payload.taskTransportationEndLat,
+    taskTransportationEndLong: payload.taskTransportationEndLong,
+    taskTransportationCost: payload.taskTransportationCost,
+    taskTransportationRemarks: payload.taskTransportationRemarks ?? null,
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Task Query Keys
@@ -30,6 +58,7 @@ import { stockOutKeys } from '@/hooks/useStockOut'
 export const taskKeys = {
   all: ['task'] as const,
   name: () => [...taskKeys.all, 'name'] as const,
+  vehicles: () => [...taskKeys.all, 'vehicles'] as const,
   assignedList: () => [...taskKeys.all, 'assigned-list'] as const,
   incompleteList: () => [...taskKeys.all, 'incomplete-list'] as const,
   pendingChecklistList: () => [...taskKeys.all, 'pending-checklist-list'] as const,
@@ -59,21 +88,68 @@ export function useTaskName() {
 }
 
 /**
+ * Fetches the delivery transport vehicle list.
+ * GET /Task/GetVehicles
+ */
+export function useTaskVehicles() {
+  return useQuery({
+    queryKey: taskKeys.vehicles(),
+    queryFn: () =>
+      apiClient
+        .get<{ dataObj?: { data?: Array<{ key: number; value: string }> } }>('/Task/GetVehicles')
+        .then((r) => (r.dataObj?.data ?? []).map((item) => ({ key: item.key, value: item.value }))),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
+  })
+}
+
+/**
  * Fetches all assigned tasks.
  * GET /Task/GetAssignedTaskList
  */
+// export function useAssignedTaskList() {
+//   return useQuery({
+//     queryKey: taskKeys.assignedList(),
+//     queryFn: () =>
+//       apiClient
+//         .get<AssignedTaskListApiResponse>('/Task/GetAssignedTaskList')
+//         .then((r): AssignedTaskListRow[] => r.dataObj?.data ?? []),
+//     staleTime: 60_000,
+//     refetchOnWindowFocus: false,
+//   })
+// }
+
+
+function isDeliveredTask(row: AssignedTaskListRow): boolean {
+  const status = String(row.taskStatus ?? '').trim().toLowerCase()
+
+  return (
+    status === 'delivered' ||
+    status === 'delivery completed' ||
+    status === 'completed' ||
+    status === 'complete' ||
+    row.taskStatusId === 1 ||
+    !!row.taskEndTime ||
+    !!row.delivered ||
+    !!row.deliveredTime
+  )
+}
+
 export function useAssignedTaskList() {
   return useQuery({
     queryKey: taskKeys.assignedList(),
     queryFn: () =>
       apiClient
         .get<AssignedTaskListApiResponse>('/Task/GetAssignedTaskList')
-        .then((r): AssignedTaskListRow[] => r.dataObj?.data ?? []),
+        .then((r): AssignedTaskListRow[] => {
+          const rows = r.dataObj?.data ?? []
+          return rows.filter((row) => !isDeliveredTask(row))
+        }),
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   })
 }
-
 /**
  * Fetches incomplete tasks list.
  * GET /Task/GetTasks/0/0
@@ -252,11 +328,31 @@ export function useCompleteChecklist() {
  */
 export function useAddTransport() {
   const qc = useQueryClient()
-  return useMutation<unknown, Error, AddTransportPayload>({
-    mutationFn: (payload) =>
-      apiClient.post(`/Task/AddTaskTransportation/${payload.taskId}`, payload),
-    onSuccess: (_, { taskId }) => {
-      qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) })
+  return useMutation<TransportMutationResponse, Error, AddTransportPayload>({
+    mutationFn: ({
+      vehicleName: _vehicleName,
+      taskTransportationStartLocationId: _taskTransportationStartLocationId,
+      taskTransportationEndLocationId: _taskTransportationEndLocationId,
+      ...payload
+    }) => apiClient.post(`/Task/AddTaskTransportation/${payload.taskId}`, payload),
+    onSuccess: (response, variables) => {
+      const taskTransportationAutoId = response.dataObj?.data
+      if (typeof taskTransportationAutoId !== 'number') {
+        qc.invalidateQueries({ queryKey: taskKeys.detail(variables.taskId) })
+        return
+      }
+
+      qc.setQueryData<TaskDetail | undefined>(taskKeys.detail(variables.taskId), (current) => {
+        if (!current) return current
+
+        return {
+          ...current,
+          taskTransportationData: [
+            ...(current.taskTransportationData ?? []),
+            buildCachedTransport(variables, taskTransportationAutoId),
+          ],
+        }
+      })
     },
   })
 }
@@ -267,11 +363,31 @@ export function useAddTransport() {
  */
 export function useUpdateTransport() {
   const qc = useQueryClient()
-  return useMutation<unknown, Error, UpdateTransportPayload>({
-    mutationFn: (payload) =>
-      apiClient.put(`/Task/UpdateTaskTransportation/${payload.taskId}`, payload),
-    onSuccess: (_, { taskId }) => {
-      qc.invalidateQueries({ queryKey: taskKeys.detail(taskId) })
+  return useMutation<TransportMutationResponse, Error, UpdateTransportPayload>({
+    mutationFn: ({
+      vehicleName: _vehicleName,
+      taskTransportationStartLocationId: _taskTransportationStartLocationId,
+      taskTransportationEndLocationId: _taskTransportationEndLocationId,
+      ...payload
+    }) => apiClient.put(`/Task/UpdateTaskTransportation/${payload.taskId}`, payload),
+    onSuccess: (_response, variables) => {
+      qc.setQueryData<TaskDetail | undefined>(taskKeys.detail(variables.taskId), (current) => {
+        if (!current) return current
+
+        return {
+          ...current,
+          taskTransportationData: (current.taskTransportationData ?? []).map((transport) =>
+            transport.taskTransportationAutoId === variables.taskTransportationAutoId
+              ? {
+                  ...transport,
+                  ...buildCachedTransport(variables, variables.taskTransportationAutoId),
+                  taskTransportationEndLat: transport.taskTransportationEndLat,
+                  taskTransportationEndLong: transport.taskTransportationEndLong,
+                }
+              : transport,
+          ),
+        }
+      })
     },
   })
 }

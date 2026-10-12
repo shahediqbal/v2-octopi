@@ -7,6 +7,7 @@ interface PurchasePriceFormProps {
   control: Control<PurchasePriceFormValues>
   errors: FieldErrors<PurchasePriceFormValues>
   isSubmitting: boolean
+  selectedProductName?: string | null
   showStayOnPage?: boolean
   stayOnPage?: boolean
   onStayOnPageChange?: (v: boolean) => void
@@ -16,6 +17,7 @@ export function PurchasePriceForm({
   control,
   errors,
   isSubmitting,
+  selectedProductName,
   showStayOnPage,
   stayOnPage,
   onStayOnPageChange,
@@ -38,6 +40,7 @@ export function PurchasePriceForm({
               type="product"
               value={field.value ?? null}
               onValueChange={field.onChange}
+              selectedLabel={selectedProductName}
               hasError={!!fieldState.error}
               placeholder="Search product…"
             />

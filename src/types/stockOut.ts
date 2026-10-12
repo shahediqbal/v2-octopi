@@ -53,6 +53,7 @@ export interface StockOutGeneralData {
   customerAddress?: string | null
   supplierAddress?: string | null
   jobTypeName?: string | null
+  marketingPersonnel?: string | null
   invoiceDate?: string | null
   dateOfIssue?: string | null
 }
@@ -143,19 +144,51 @@ export interface StockOutLatestMapProductInfo {
   mapProduct?: string | null
   invoiceDate?: string | null
 }
-
-export interface StockOutLatestBatchMap {
-  sodMappedProductId?: number | null
-  sodBatches?: string | null
-  mappedProductName?: string | null
-  mapProduct?: string | null
+export interface StockOutLastBatchInfo {
   batchNo?: string | null
   maxInvoiceDate?: string | null
-  invoiceDate?: string | null
-  lastBatch?: StockOutLatestBatchInfo | null
-  lastMapProduct?: StockOutLatestMapProductInfo | null
 }
 
+export interface StockOutLastMapProductInfo {
+  sodMappedProductId?: number | null
+  mapProduct?: string | null
+  invoiceDate?: string | null
+}
+
+export interface StockOutLatestBatchMap {
+  // Old/single response support
+  batchNo?: string | null
+  maxInvoiceDate?: string | null
+  mappedProductName?: string | null
+  mapProduct?: string | null
+  invoiceDate?: string | null
+  sodMappedProductId?: number | null
+
+  // Current backend response
+  lastBatch?: StockOutLastBatchInfo | null
+  lastMapProduct?: StockOutLastMapProductInfo | null
+  lastBatches?: StockOutLastBatchInfo[]
+  lastMapProducts?: StockOutLastMapProductInfo[]
+}
+// export interface StockOutLatestBatchMap {
+//   sodMappedProductId?: number | null
+//   sodBatches?: string | null
+//   mappedProductName?: string | null
+//   mapProduct?: string | null
+//   batchNo?: string | null
+//   maxInvoiceDate?: string | null
+//   invoiceDate?: string | null
+//   lastBatch?: StockOutLatestBatchInfo | null
+//   lastMapProduct?: StockOutLatestMapProductInfo | null
+// }
+// export interface StockOutLastBatchMapOrder {
+//   soSystemId?: number | null
+//   soSystemNo?: string | null
+//   invoiceDate?: string | null
+//   batchNo?: string | null
+//   mappedProductName?: string | null
+//   mapProduct?: string | null
+// }
 export interface StockOutPackagingInfoItem {
   soSystemId: number
   sodProductId?: number | null
@@ -170,6 +203,8 @@ export interface StockOutPackagingInfoItem {
   sopProductQty?: number | null
   sopPackSize?: number | null
   sopNoPack?: number | null
+  sodBatches?: Array<{ batchId?: number | null; batchNo?: string | null }> | null
+  lotNo?: string | null
 }
 
 export interface StockOutPackagingDetail {
@@ -179,6 +214,7 @@ export interface StockOutPackagingDetail {
   customerName?: string | null
   supplierName?: string | null
   jobType?: string | null
+  customerFlag?: 0 | 1 | null
   stockOutPackagingItems: StockOutPackagingInfoItem[]
 }
 

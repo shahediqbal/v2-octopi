@@ -18,7 +18,28 @@ interface StockOutMutationMappingOptions {
 }
 
 const VALIDATION_ERROR_TITLE = 'One or more validation errors occurred.'
+function todayAsDateOnly() {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
 
+  return `${year}-${month}-${day}`
+}
+
+function toDateInputValue(value?: string | Date | null) {
+  if (!value) return ''
+
+  if (typeof value === 'string') {
+    return value.slice(0, 10)
+  }
+
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
 function flattenValidationErrors(errors: Record<string, string[] | undefined> | null | undefined): string[] {
   return Object.values(errors ?? {}).flatMap((messages) =>
     Array.isArray(messages)
@@ -128,9 +149,10 @@ export function mapDetailToFormValues(detail: StockOutOrderDetail): StockOutForm
     soSupplierId: detail.stockOutGeneralData.soSupplierId ?? null,
     soJobTypeId: detail.stockOutGeneralData.soJobTypeId,
     soOrderFromId: detail.stockOutGeneralData.soOrderFromId,
-    invoiceDate: detail.stockOutGeneralData.invoiceDate
-      ? new Date(detail.stockOutGeneralData.invoiceDate).toISOString().slice(0, 10)
-      : new Date().toISOString().slice(0, 10),
+    // invoiceDate: detail.stockOutGeneralData.invoiceDate
+    //   ? new Date(detail.stockOutGeneralData.invoiceDate).toISOString().slice(0, 10)
+    //   : new Date().toISOString().slice(0, 10),
+    invoiceDate: toDateInputValue(detail.stockOutGeneralData.invoiceDate) || todayAsDateOnly(),
     soCustomerReferance: detail.stockOutGeneralData.soCustomerReferance ?? '',
     soRelatedLcId: detail.stockOutGeneralData.soRelatedLcId ?? '',
     soRemarks: detail.stockOutGeneralData.soRemarks ?? '',
@@ -155,6 +177,11 @@ export function mapDetailToFormValues(detail: StockOutOrderDetail): StockOutForm
       discountRate: parseNumeric(item.sodUnitDiscountRate),
       discountType: item.sodUnitDiscountType === 'P' ? 'P' : 'F',
       itemRemark: item.itemRemark ?? '',
+      sodMappedProductId: item.sodMappedProductId ?? null,
+      sodBatchId:
+        Array.isArray(item.sodBatches) && item.sodBatches.length > 0
+          ? (item.sodBatches[0]?.batchId ?? null)
+          : null,
     })),
   }
 }
@@ -228,6 +255,13 @@ export function mapFormValuesToMutationPayload(
         sodFinalCalculatedUnitPrice: itemLineTotals[index],
         itemRemark: item.itemRemark,
         productName: resolveProductLabel(item, existingItem),
+        sodMappedProductId: item.sodMappedProductId !== undefined ? item.sodMappedProductId : (existingItem?.sodMappedProductId ?? null),
+        sodBatches:
+          item.sodBatchId !== undefined
+            ? item.sodBatchId != null
+              ? [{ batchId: item.sodBatchId, batchNo: '' }]
+              : null
+            : existingItem?.sodBatches ?? null,
       }
     }),
     stockOutBillData: {

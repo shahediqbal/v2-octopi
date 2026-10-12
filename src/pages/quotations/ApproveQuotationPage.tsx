@@ -163,7 +163,7 @@ export function ApproveQuotationPage() {
           type="button"
           onClick={handleApprove}
           disabled={approveMutation.isPending}
-          className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
+          className="action-insert inline-flex items-center gap-2 rounded-lg bg-gray-800 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
         >
           {approveMutation.isPending
             ? <Loader2 size={14} className="animate-spin" />

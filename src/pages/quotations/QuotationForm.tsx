@@ -68,6 +68,7 @@ function QuotationLineItemRow({
 
   const calculatedPrice = useWatch({ control, name: `items.${index}.pqdCalculatedPrice` })
   const finalPrice = useWatch({ control, name: `items.${index}.pqdFinalPrice` })
+  const productName = useWatch({ control, name: `items.${index}.productName` })
   const currency = useWatch({ control, name: 'pqCurrencyName' })
 
   return (
@@ -81,7 +82,14 @@ function QuotationLineItemRow({
             <PaginatedCombobox
               type="product"
               value={field.value || null}
-              onValueChange={field.onChange}
+              onValueChange={(value) => {
+                field.onChange(value)
+                if (value == null) {
+                  setValue(`items.${index}.productName`, '')
+                }
+              }}
+              onLabelChange={(label) => setValue(`items.${index}.productName`, label ?? '')}
+              selectedLabel={productName || null}
               placeholder="Select product…"
             />
           )}

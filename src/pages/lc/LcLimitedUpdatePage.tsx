@@ -26,6 +26,9 @@ export function LcLimitedUpdatePage() {
 
   const { data, isLoading, isError } = useLcDetail(lcDocId)
   const updateMutation = useLcLimitedUpdate()
+  const issuerBankLabel = data?.chequeBankName ?? data?.issuerBankName ?? null
+  const issuerLocationLabel =
+    data?.locationName ?? data?.issuerBranchLocationName ?? data?.branchLocationName ?? null
 
   const {
     control,
@@ -39,8 +42,8 @@ export function LcLimitedUpdatePage() {
       lcNumber: '',
       lcAmount: 0,
       lcDate: '',
-      chequeBankId: 0,
-      locationId: 0,
+      lcIssuerBankId: 0,
+      lcIssuerBranchLocationId: 0,
     },
   })
 
@@ -49,9 +52,9 @@ export function LcLimitedUpdatePage() {
       reset({
         lcNumber: data.lcNumber ?? '',
         lcAmount: data.lcAmount ?? 0,
-        lcDate: data.lcDate ?? '',
-        chequeBankId: data.chequeBankId ?? 0,
-        locationId: data.locationId ?? 0,
+        lcDate: data.lcDate ? data.lcDate.split('T')[0] : '',
+        lcIssuerBankId: data.lcIssuerBankId ?? data.chequeBankId ?? 0,
+        lcIssuerBranchLocationId: data.lcIssuerBranchLocationId ?? data.locationId ?? 0,
       })
     }
   }, [data, reset])
@@ -161,26 +164,27 @@ export function LcLimitedUpdatePage() {
             <div>
               <label className={LABEL}>Issuer Bank *</label>
               <Controller
-                name="chequeBankId"
+                name="lcIssuerBankId"
                 control={control}
                 render={({ field, fieldState }) => (
                   <DropdownSelect
                     type="bank"
                     value={field.value || null}
                     onValueChange={(v) => field.onChange(v ?? 0)}
+                    selectedLabel={issuerBankLabel}
                     placeholder="Select bank"
                     hasError={!!fieldState.error}
                   />
                 )}
               />
-              {errors.chequeBankId && <p className={ERR_MSG}>{errors.chequeBankId.message}</p>}
+              {errors.lcIssuerBankId && <p className={ERR_MSG}>{errors.lcIssuerBankId.message}</p>}
             </div>
 
             {/* Branch Location */}
             <div>
               <label className={LABEL}>Branch Location *</label>
               <Controller
-                name="locationId"
+                name="lcIssuerBranchLocationId"
                 control={control}
                 render={({ field }) => (
                   <PaginatedCombobox
@@ -188,10 +192,11 @@ export function LcLimitedUpdatePage() {
                     value={field.value || null}
                     onValueChange={(v) => field.onChange(v ?? 0)}
                     hasError={!!errors.locationId}
+                    selectedLabel={issuerLocationLabel}
                   />
                 )}
               />
-              {errors.locationId && <p className={ERR_MSG}>{errors.locationId.message}</p>}
+              {errors.lcIssuerBranchLocationId && <p className={ERR_MSG}>{errors.lcIssuerBranchLocationId.message}</p>}
             </div>
           </div>
 
@@ -199,7 +204,7 @@ export function LcLimitedUpdatePage() {
             <button
               type="submit"
               disabled={updateMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
+              className="action-update inline-flex items-center gap-2 rounded-lg bg-gray-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:opacity-60"
             >
               {updateMutation.isPending && <Loader2 size={14} className="animate-spin" />}
               Save Changes

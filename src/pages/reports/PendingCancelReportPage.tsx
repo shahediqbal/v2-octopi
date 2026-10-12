@@ -116,13 +116,13 @@ export function PendingCancelReportPage() {
             <button
               onClick={() => void refetch()}
               disabled={isLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
               Refresh
             </button>
             {(filterPending || filterChannel || filterAssignee || search) && (
-              <button onClick={handleReset} className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+              <button onClick={handleReset} className="action-report rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                 Reset
               </button>
             )}
@@ -185,7 +185,7 @@ export function PendingCancelReportPage() {
                           {item.soSystemId != null && (
                             <button
                               onClick={() => setModalInvoiceId(item.soSystemId)}
-                              className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                              className="action-view inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
                             >
                               <Eye size={12} /> View
                             </button>

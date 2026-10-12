@@ -100,6 +100,8 @@ export function PaymentReportPage() {
     return reportData.filter((item) => {
       if (!query) return true
       return (
+        String(item.paymentSystemId ?? '').toLowerCase().includes(query) ||
+        String(item.paymentCustomerId ?? '').toLowerCase().includes(query) ||
         item.customerName?.toLowerCase().includes(query) ||
         item.soSystemNo?.toLowerCase().includes(query) ||
         item.moenyRecepitNo?.toLowerCase().includes(query) ||
@@ -217,7 +219,7 @@ export function PaymentReportPage() {
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Customer, invoice, receipt, method…"
+                placeholder="Payment ID, customer ID, customer, invoice, receipt…"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 className={`${inputCls} pl-8`}
@@ -230,7 +232,7 @@ export function PaymentReportPage() {
               <button
                 onClick={handleLoad}
                 disabled={loadingReport || !!dateError}
-                className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loadingReport && <Loader2 size={14} className="animate-spin" />}
                 {loadingReport ? 'Loading…' : 'Load Data'}
@@ -240,7 +242,7 @@ export function PaymentReportPage() {
                 <button
                   onClick={handleExport}
                   disabled={filteredData.length === 0}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <FileSpreadsheet size={14} />
                   Excel
@@ -248,7 +250,7 @@ export function PaymentReportPage() {
                 <button
                   onClick={handleLoad}
                   disabled={loadingReport || !!dateError}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                  className="action-report inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
                 >
                   <RefreshCw size={14} className={loadingReport ? 'animate-spin' : ''} />
                   Refresh
@@ -332,6 +334,7 @@ export function PaymentReportPage() {
               <thead className="sticky top-0 border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Payment Id</th>
+                  <th className="px-4 py-3 font-semibold">Customer Id</th>
                   <th className="px-4 py-3 font-semibold">Invoice No</th>
                   <th className="px-4 py-3 font-semibold">Customer</th>
                   <th className="px-4 py-3 font-semibold">Payment Date</th>
@@ -344,7 +347,7 @@ export function PaymentReportPage() {
               <tbody className="divide-y divide-gray-100">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                    <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
                       No data found matching your search
                     </td>
                   </tr>
@@ -356,6 +359,7 @@ export function PaymentReportPage() {
                           {item.paymentSystemId ?? '-'}
                         </span>
                       </td>
+                      <td className="px-4 py-2.5 tabular-nums text-gray-700">{item.paymentCustomerId ?? '-'}</td>
                       <td className="px-4 py-2.5 font-medium text-gray-900">{item.soSystemNo || '-'}</td>
                       <td className="px-4 py-2.5 text-gray-700">{item.customerName || '-'}</td>
                       <td className="px-4 py-2.5 text-gray-600">{fmtDate(item.paymentDate)}</td>

@@ -116,6 +116,7 @@ export function PackingPrintPage() {
         isLoading={loadingOrderDetail}
         errorMessage={(orderDetailError as Error | undefined)?.message}
         title="Invoice / Detail"
+        viewVariant="packing-print"
         onClose={closeModal}
       />
 

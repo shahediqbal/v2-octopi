@@ -16,6 +16,8 @@ export const stockOutItemSchema = z.object({
   discountRate: nonNegativeNumber,
   discountType: discountTypeSchema,
   itemRemark: z.string().trim(),
+  sodMappedProductId: z.number().int().nullable().optional(),
+  sodBatchId: z.number().int().nullable().optional(),
 })
 
 export const createStockOutSchema = z.object({

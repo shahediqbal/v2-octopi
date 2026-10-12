@@ -57,7 +57,7 @@ export function LcRedirectModal({ open, onClose }: LcRedirectModalProps) {
           <button
             type="button"
             onClick={handleNavigate}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            className="action-view inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
             Go to LC Payments <ArrowRight size={14} />
           </button>

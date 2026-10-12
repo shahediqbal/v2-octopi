@@ -9,6 +9,20 @@ import { PaginatedCombobox } from '@/components/dropdowns/PaginatedCombobox'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { LcEditListFilters } from '@/types/lcTracking'
 
+const formatDateLocal = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getDefaultDates = () => {
+  const today = new Date()
+  const start = new Date(today)
+  start.setDate(today.getDate() - 15)
+  return { fromDate: formatDateLocal(start), toDate: formatDateLocal(today) }
+}
+
 const filterSchema = z.object({
   customerId: z.number().nullable().default(null),
   fromDate: z.string().default(''),
@@ -24,12 +38,13 @@ export function LcEditListPage() {
   const navigate = useNavigate()
   const [filters, setFilters] = useState<LcEditListFilters>({})
   const [searched, setSearched] = useState(false)
+  const defaults = getDefaultDates()
 
   const { data: lcList = [], isLoading, isError } = useLcEditList(filters, searched)
 
   const { control, handleSubmit, register } = useForm<FilterValues>({
     resolver: zodResolver(filterSchema) as Resolver<FilterValues>,
-    defaultValues: { customerId: null, fromDate: '', toDate: '' },
+    defaultValues: { customerId: null, fromDate: defaults.fromDate, toDate: defaults.toDate },
   })
 
   const onSearch = (data: FilterValues) => {
@@ -79,7 +94,7 @@ export function LcEditListPage() {
           <div className="mt-4">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
+              className="action-report inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
             >
               <Search size={14} /> Search
             </button>
@@ -108,13 +123,17 @@ export function LcEditListPage() {
                     <th className="px-5 py-3 text-left">Customer</th>
                     <th className="px-5 py-3 text-left">LC Date</th>
                     <th className="px-5 py-3 text-right">LC Amount</th>
+                    <th className="px-5 py-3 text-left">Issuer Bank</th>
+                    <th className="px-5 py-3 text-left">Branch Location</th>
+                    <th className="px-5 py-3 text-left">PI Number</th>
+                    <th className="px-5 py-3 text-left">PI Date</th>
                     <th className="px-5 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {lcList.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-10 text-center text-gray-400">
+                      <td colSpan={9} className="px-5 py-10 text-center text-gray-400">
                         No LCs found for the selected filters.
                       </td>
                     </tr>
@@ -129,11 +148,17 @@ export function LcEditListPage() {
                         <td className="px-5 py-3 text-right font-medium text-gray-900">
                           {formatCurrency(lc.lcAmount ?? 0)}
                         </td>
+                        <td className="px-5 py-3 text-gray-700">{lc.chequeBankName || '—'}</td>
+                        <td className="px-5 py-3 text-gray-700">{lc.locationName || '—'}</td>
+                        <td className="px-5 py-3 text-gray-700">{lc.piNumber || '—'}</td>
+                        <td className="px-5 py-3 text-gray-500">
+                          {lc.piDate ? formatDate(lc.piDate) : '—'}
+                        </td>
                         <td className="px-5 py-3 text-right">
                           <button
                             type="button"
                             onClick={() => navigate(`/lc/${lc.lcDocId}/limited-update`)}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                            className="action-update inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                           >
                             <Pencil size={12} /> Edit
                           </button>

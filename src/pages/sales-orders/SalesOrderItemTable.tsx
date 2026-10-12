@@ -1,7 +1,9 @@
-import { type FieldArrayWithId, type FieldErrors, type UseFormRegister } from 'react-hook-form'
-import { Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { type Control, type FieldArrayWithId, type FieldErrors, type UseFormRegister, Controller } from 'react-hook-form'
+import { Loader2, Trash2 } from 'lucide-react'
 import { calculateProductLineTotal, parseNumeric } from '@/features/stock-out/calculations'
 import { getStockOutFieldRule } from '@/features/stock-out/fieldRules'
+import { useStockOutBatches } from '@/hooks/useStockOut'
 import type { StockOutFormValues } from '@/schemas/stockOutSchema'
 import type { EditMode } from '@/types/stockOut'
 
@@ -9,6 +11,7 @@ interface SalesOrderItemTableProps {
   mode?: EditMode
   hidePricingColumns?: boolean
   register: UseFormRegister<StockOutFormValues>
+  control?: Control<StockOutFormValues>
   fields: FieldArrayWithId<StockOutFormValues, 'items', 'id'>[]
   errors: FieldErrors<StockOutFormValues>
   onRemove: (index: number) => void
@@ -17,6 +20,87 @@ interface SalesOrderItemTableProps {
 
 const inputCls =
   'block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200'
+
+// ─── per-row Map? + Batch # cells for admin-price-edit ──────────────────────
+
+interface PriceEditCellsProps {
+  index: number
+  productId: number
+  control: Control<StockOutFormValues>
+}
+
+function PriceEditCells({ index, productId, control }: PriceEditCellsProps) {
+  const { data: batchLookup, isLoading } = useStockOutBatches(productId)
+  const batches = batchLookup?.finalBatch ?? []
+  const mappedItems = batchLookup?.finalMappedItem ?? []
+
+  return (
+    <>
+      {/* Map? */}
+      <td className="px-4 py-3">
+        <Controller
+          control={control}
+          name={`items.${index}.sodMappedProductId`}
+          render={({ field }) => {
+            const [showSelect, setShowSelect] = useState(field.value != null)
+            return (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showSelect}
+                  onChange={(e) => {
+                    setShowSelect(e.target.checked)
+                    if (!e.target.checked) field.onChange(null)
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
+                />
+                {showSelect && (
+                  isLoading ? (
+                    <Loader2 size={14} className="animate-spin text-gray-400" />
+                  ) : (
+                    <select
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      className="w-44 rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-800 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                    >
+                      <option value="">— Map product —</option>
+                      {mappedItems.map((m) => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </select>
+                  )
+                )}
+              </div>
+            )
+          }}
+        />
+      </td>
+      {/* Batch # */}
+      <td className="px-4 py-3">
+        <Controller
+          control={control}
+          name={`items.${index}.sodBatchId`}
+          render={({ field }) => (
+            isLoading ? (
+              <Loader2 size={14} className="animate-spin text-gray-400" />
+            ) : (
+              <select
+                value={field.value ?? ''}
+                onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-800 focus:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              >
+                <option value="">— Select batch —</option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.label}</option>
+                ))}
+              </select>
+            )
+          )}
+        />
+      </td>
+    </>
+  )
+}
 
 const numericInput = {
   setValueAs: (value: string | number | null | undefined) => {
@@ -32,6 +116,7 @@ export function SalesOrderItemTable({
   mode = 'standard',
   hidePricingColumns = false,
   register,
+  control,
   fields,
   errors,
   onRemove,
@@ -43,7 +128,8 @@ export function SalesOrderItemTable({
   const discountRule = getStockOutFieldRule(mode, 'discount')
   const taxRule = getStockOutFieldRule(mode, 'tax')
   const canRemove = productRule === 'editable'
-  const showRemark = mode !== 'standard'
+  const showRemark = mode !== 'standard' && mode !== 'admin-price-edit'
+  const showPriceEditCols = mode === 'admin-price-edit'
   const showPriceColumn = !hidePricingColumns && priceRule !== 'hidden'
   const showDiscountColumns = !hidePricingColumns && discountRule !== 'hidden'
   const showTaxColumns = !hidePricingColumns && taxRule !== 'hidden'
@@ -55,6 +141,7 @@ export function SalesOrderItemTable({
     (showTaxColumns ? 2 : 0) +
     (showLineTotalColumn ? 1 : 0) +
     (showRemark ? 1 : 0) +
+    (showPriceEditCols ? 2 : 0) +
     (canRemove ? 1 : 0)
 
   return (
@@ -72,6 +159,8 @@ export function SalesOrderItemTable({
               {showTaxColumns && <th className="px-4 py-3">AIT %</th>}
               {showLineTotalColumn && <th className="px-4 py-3 text-center">Line Total</th>}
               {showRemark && <th className="px-4 py-3">Remark</th>}
+              {showPriceEditCols && <th className="px-4 py-3 text-center">Map?</th>}
+              {showPriceEditCols && <th className="px-4 py-3 text-center">Batch #</th>}
               {canRemove && <th className="px-4 py-3 text-center">Action</th>}
             </tr>
           </thead>
@@ -193,6 +282,13 @@ export function SalesOrderItemTable({
                     <td className="min-w-[12rem] px-4 py-3">
                       <input {...register(`items.${index}.itemRemark`)} className={inputCls} placeholder="Optional note" readOnly={mode === 'admin-packing-edit'} />
                     </td>
+                  )}
+                  {showPriceEditCols && control && (
+                    <PriceEditCells
+                      index={index}
+                      productId={rowValue?.productId ?? 0}
+                      control={control}
+                    />
                   )}
                   {canRemove && (
                     <td className="px-4 py-3 text-center">

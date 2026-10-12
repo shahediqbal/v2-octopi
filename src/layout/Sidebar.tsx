@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ChevronDown,
   ChevronRight,
@@ -46,6 +46,7 @@ import { cn } from '@/lib/utils'
 import type { AppMenuItem } from '@/types/auth'
 import { useUIStore } from '@/stores/uiStore'
 import { usePinnedMenuStore } from '@/stores/pinnedMenuStore'
+import { getDefaultAuthenticatedRoute } from '@/auth/authBridge'
 
 /* ─── static v2 nav items (always shown) ─── */
 export const staticNav = [
@@ -89,8 +90,6 @@ export const staticNav = [
   { id: 'batches', label: 'Batches', path: '/batches', icon: Layers },
 ]
 
-const dashboardItem = { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }
-
 const adminNav = [
   { id: 'manage-roles', label: 'Manage Role & Menu', path: '/admin/roles', icon: ShieldCheck },
   { id: 'user-signup', label: 'User Registration', path: '/users/signup', icon: UserPlus },
@@ -103,6 +102,7 @@ interface SidebarProps {
 
 export function Sidebar({ dynamicMenus }: SidebarProps) {
   const location = useLocation()
+  const dashboardPath = getDefaultAuthenticatedRoute()
   const collapsed = useUIStore((s) => s.sidebarCollapsed)
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
@@ -171,11 +171,11 @@ export function Sidebar({ dynamicMenus }: SidebarProps) {
 
           {/* Dashboard – always visible */}
           <Link
-            to={dashboardItem.path}
+            to={dashboardPath}
             onClick={closeMobileSidebar}
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              isActive(dashboardItem.path)
+              isActive(dashboardPath)
                 ? 'bg-gray-100 text-gray-900'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
             )}
@@ -345,10 +345,19 @@ function SectionLabel({ collapsed, children }: { collapsed: boolean; children: R
 }
 
 function DynamicMenuItem({ item, collapsed, onNavigate }: { item: AppMenuItem; collapsed: boolean; onNavigate?: () => void }) {
-  const [open, setOpen] = useState(false)
   const location = useLocation()
   const hasChildren = item.children && item.children.length > 0
   const isActive = item.path && location.pathname === item.path
+
+  const isChildActive = hasChildren
+    ? item.children!.some((child) => child.path && location.pathname === child.path)
+    : false
+
+  const [open, setOpen] = useState(() => isChildActive)
+
+  useEffect(() => {
+    if (isChildActive) setOpen(true)
+  }, [isChildActive])
 
   if (!hasChildren) {
     return item.path ? (
@@ -387,7 +396,7 @@ function DynamicMenuItem({ item, collapsed, onNavigate }: { item: AppMenuItem; c
                 to={child.path}
                 onClick={onNavigate}
                 className={cn(
-                  'block rounded-lg px-3 py-1.5 text-[13px] transition-colors',
+                  'block rounded-lg px-3 py-1.5 text-[15px] transition-colors',
                   location.pathname === child.path
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900',
@@ -396,7 +405,7 @@ function DynamicMenuItem({ item, collapsed, onNavigate }: { item: AppMenuItem; c
                 {child.label}
               </Link>
             ) : (
-              <span key={child.id} className="block px-3 py-1.5 text-[13px] text-gray-400">
+              <span key={child.id} className="block px-3 py-1.5 text-[15px] text-gray-400">
                 {child.label}
               </span>
             ),

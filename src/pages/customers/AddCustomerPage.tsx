@@ -32,6 +32,7 @@ export function AddCustomerPage() {
         currentStatus: data.currentStatus ?? '',
         linkCustomerId: data.linkCustomerId,
         specialNote: data.specialNote ?? '',
+        disputeAmount: data.disputeAmount,
       },
       {
         onSuccess: (res) => {

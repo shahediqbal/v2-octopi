@@ -13,6 +13,8 @@ export interface ProductOutReportItem {
   jobType: string | null
   sodProductId: number | null
   productName: string | null
+  mappedProductId: number | null
+  mappedProductName: string | null
   sodConfirmedQty: number | null
   sodConfirmedUnitPrice: number | null
   soCurrentStatus: number | null

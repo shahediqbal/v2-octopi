@@ -1,5 +1,6 @@
 export interface LegacyUserInfo {
   token: string
+  userName?: string
   menuToken?: string
   menuInPlainListToken?: string
 }

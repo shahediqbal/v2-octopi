@@ -6,19 +6,32 @@ import {
   Search,
   LogOut,
   User,
+  KeyRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUIStore } from '@/stores/uiStore'
 import { getLegacyUserInfo, logoutFromBridge } from '@/auth/authBridge'
 import { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { jwtDecode } from 'jwt-decode'
 
 export function Header() {
+  const navigate = useNavigate()
   const collapsed = useUIStore((s) => s.sidebarCollapsed)
   const toggleCollapse = useUIStore((s) => s.toggleSidebarCollapse)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
 
   const userInfo = getLegacyUserInfo()
-  const displayName = (userInfo as Record<string, unknown> | null)?.userName as string | undefined
+  const displayName = (() => {
+    try {
+      const token = userInfo?.token
+      if (!token) return undefined
+      const decoded = jwtDecode<{ UserFullName?: string }>(token)
+      return decoded.UserFullName
+    } catch {
+      return undefined
+    }
+  })()
 
   const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
@@ -35,7 +48,7 @@ export function Header() {
 
   const handleLogout = () => {
     logoutFromBridge()
-    window.location.href = '/signin'
+    navigate('/signin', { replace: true })
   }
 
   return (
@@ -88,14 +101,17 @@ export function Header() {
           <button
             type="button"
             onClick={() => setProfileOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-100"
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 transition-colors"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-700">
-              <User size={16} />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white font-semibold text-sm shrink-0">
+              {displayName ? displayName.charAt(0).toUpperCase() : <User size={16} />}
             </div>
-            <span className="hidden sm:block text-sm font-medium text-gray-700">
-              {displayName || 'User'}
-            </span>
+            <div className="flex flex-col items-start leading-tight">
+              <span className="text-xs text-gray-400 font-normal">Logged in as</span>
+              <span className="text-sm font-semibold text-gray-800">
+                {displayName || 'User'}
+              </span>
+            </div>
           </button>
 
           {profileOpen && (
@@ -104,6 +120,15 @@ export function Header() {
                 'absolute right-0 mt-1 w-48 rounded-xl border border-gray-200 bg-white py-1 shadow-lg',
               )}
             >
+              <Link
+                to="/users/change-password"
+                onClick={() => setProfileOpen(false)}
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <KeyRound size={16} />
+                Change Password
+              </Link>
+              <div className="my-1 border-t border-gray-100" />
               <button
                 type="button"
                 onClick={handleLogout}

@@ -1,56 +1,33 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, AlertCircle, CreditCard } from 'lucide-react'
-import { usePiByStatus, useLcPaymentSummary } from '@/hooks/useLcTracking'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { usePiByStatus } from '@/hooks/useLcTracking'
 import type { PiByStatus } from '@/types/lcTracking'
 
-function PaymentSummaryCell({ lcDocId }: { lcDocId: number }) {
-  const { data } = useLcPaymentSummary(lcDocId)
-  if (!data) return <span className="text-gray-400">—</span>
-  return (
-    <div className="text-right text-xs">
-      <p className="font-medium text-gray-900">{formatCurrency(data.totalPaid ?? 0)}</p>
-      <p className="text-gray-400">of {formatCurrency(data.lcAmount ?? 0)}</p>
-    </div>
-  )
-}
+const TH = 'px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-white'
+const TD = 'px-4 py-3 text-center text-sm text-gray-800'
 
 export function LcPaymentOperationsPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
 
-  const { data: piList = [], isLoading, isError } = usePiByStatus(2)
+  const { data: piList = [], isLoading, isError } = usePiByStatus(3)
 
-  const filtered = (piList as PiByStatus[]).filter(
-    (pi) =>
-      pi.piNumber?.toLowerCase().includes(search.toLowerCase()) ||
-      pi.customerName?.toLowerCase().includes(search.toLowerCase()),
-  )
+  const rows = piList as PiByStatus[]
+  const total = rows.length
+  const pageCount = Math.ceil(total / rowsPerPage)
+  const start = page * rowsPerPage
+  const end = Math.min(start + rowsPerPage, total)
+  const pageRows = rows.slice(start, end)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">LC Payment Operations</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
-            Record payments against LC documents
-          </p>
-        </div>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">LC Payments</h1>
+        <p className="mt-0.5 text-sm text-gray-500">List of Payments (Status = 3)</p>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <input
-          type="text"
-          placeholder="Search by PI number or customer..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200"
-        />
-      </div>
-
-      {/* Table */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
@@ -63,47 +40,47 @@ export function LcPaymentOperationsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100 text-sm">
+            <table className="min-w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
-                  <th className="px-5 py-3 text-left">PI Number</th>
-                  <th className="px-5 py-3 text-left">Customer</th>
-                  <th className="px-5 py-3 text-left">PI Date</th>
-                  <th className="px-5 py-3 text-right">Payment Progress</th>
-                  <th className="px-5 py-3 text-right">Action</th>
+                <tr style={{ backgroundColor: '#013220' }}>
+                  <th className={TH}>PI System</th>
+                  <th className={TH}>PI Number</th>
+                  <th className={TH}>PI Ref</th>
+                  <th className={TH}>PI Date</th>
+                  <th className={TH}>Customer Name</th>
+                  <th className={TH}>LC Number</th>
+                  <th className={TH}>LC Date</th>
+                  <th className={TH}>LC Doc Id</th>
+                  <th className={TH}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.length === 0 ? (
+              <tbody className="divide-y divide-gray-100">
+                {pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-gray-400">
-                      No LC documents available for payment.
+                    <td colSpan={9} className="px-5 py-10 text-center text-gray-400">
+                      No proforma invoices available
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((pi) => (
-                    <tr key={pi.piSystemId} className="hover:bg-gray-50/50">
-                      <td className="px-5 py-3 font-medium text-gray-900">{pi.piNumber}</td>
-                      <td className="px-5 py-3 text-gray-700">{pi.customerName}</td>
-                      <td className="px-5 py-3 text-gray-500">
-                        {pi.piDate ? formatDate(pi.piDate) : '—'}
-                      </td>
-                      <td className="px-5 py-3">
-                        {pi.lcDocId ? (
-                          <PaymentSummaryCell lcDocId={pi.lcDocId} />
-                        ) : (
-                          <span className="text-gray-400 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-right">
+                  pageRows.map((pi) => (
+                    <tr key={pi.piSystemId} className="hover:bg-gray-50">
+                      <td className={TD}>{pi.piSystemId}</td>
+                      <td className={TD}>{pi.piNumber}</td>
+                      <td className={TD}>{pi.piRef}</td>
+                      <td className={TD}>{pi.piDate ? pi.piDate.split('T')[0] : '—'}</td>
+                      <td className={TD}>{pi.customerName}</td>
+                      <td className={TD}>{pi.lcNumber ?? '—'}</td>
+                      <td className={TD}>{pi.lcDate ? pi.lcDate.split('T')[0] : '—'}</td>
+                      <td className={TD}>{pi.lcDocId ?? '—'}</td>
+                      <td className={TD}>
                         <button
                           type="button"
-                          onClick={() =>
-                            navigate(`/lc/payment/new?lcDocId=${pi.lcDocId ?? pi.piSystemId}`)
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                          disabled={!pi.lcDocId}
+                          onClick={() => navigate(`/lc/payment/new?lcDocId=${pi.lcDocId}&customerId=${pi.piCustmomerId ?? 0}`)}
+                          className="rounded px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                          style={{ backgroundColor: '#32CD32' }}
                         >
-                          <CreditCard size={12} /> Add Payment
+                          Payment
                         </button>
                       </td>
                     </tr>
@@ -111,6 +88,45 @@ export function LcPaymentOperationsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination footer */}
+        {!isLoading && !isError && total > 0 && (
+          <div className="flex items-center justify-end gap-6 border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
+            <div className="flex items-center gap-2">
+              <span>Rows per page:</span>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0) }}
+                className="rounded border border-gray-300 px-1 py-0.5 text-sm focus:outline-none"
+              >
+                {[10, 20, 100].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+            <span>
+              {start + 1}–{end} of {total}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="rounded p-1 hover:bg-gray-100 disabled:opacity-30"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                disabled={page >= pageCount - 1}
+                className="rounded p-1 hover:bg-gray-100 disabled:opacity-30"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         )}
       </div>

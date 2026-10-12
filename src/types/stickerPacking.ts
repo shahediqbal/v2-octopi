@@ -30,19 +30,14 @@ export interface PackingItem {
 }
 
 // ─── Create Packing Payload ───
-export interface CreateStickerPackagingPayload {
-  soSystemId: number
-  stockOutPackagingItems: StickerPackagingItemPayload[]
-}
+export type CreateStickerPackagingPayload = StickerPackagingItemPayload[]
 
 // ─── Update Packing Payload ───
-export interface UpdateStickerPackagingPayload {
-  soSystemId: number
-  stockOutPackagingItems: StickerPackagingItemPayload[]
-}
+export type UpdateStickerPackagingPayload = StickerPackagingItemPayload[]
 
 // ─── Sticker Packaging Item Payload ───
 export interface StickerPackagingItemPayload {
+  soSystemId: number
   sopProductId: number
   sopPackSize: number
   sopNoPack: number
@@ -86,5 +81,6 @@ export interface SalesOrderInternalDetail {
 export interface SalesOrderInternalItem {
   sodProductId: number
   productName: string | null
+  sodQty?: number | null
   sodConfirmedQty: number | null
 }
